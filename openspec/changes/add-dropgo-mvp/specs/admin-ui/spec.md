@@ -1,0 +1,59 @@
+## ADDED Requirements
+
+### Requirement: Upload page
+The admin host root SHALL be the upload page. It has a drop zone and file picker at the top and a settings form below it with path, visibility, password (shown only for `password` visibility) and expiry (never, 1 day, 7 days, 30 days, custom date and time). For a folder or a single file, the upload button SHALL stay disabled until the files pass the ignore and entry checks. A zip SHALL be checked by the server, which reports any error on the page.
+
+#### Scenario: Successful upload
+- **WHEN** the owner drops a folder, fills the form and presses upload
+- **THEN** the page shows the share URL with a copy button
+
+#### Scenario: Checks fail
+- **WHEN** the selected folder has no entry file
+- **THEN** the upload button stays disabled and the page explains why
+
+#### Scenario: Zip with an error
+- **WHEN** the owner uploads a zip with no entry file
+- **THEN** the page shows the server's error message
+
+#### Scenario: Form defaults
+- **WHEN** the upload page loads
+- **THEN** visibility is `owner` and expiry is never, whatever was chosen last time
+
+#### Scenario: Overwrite prompt
+- **WHEN** the entered path belongs to one of the owner's active shares
+- **THEN** the form fills in that share's visibility and expiry and asks for confirmation before uploading
+
+### Requirement: Share list
+A list page reachable from the top nav SHALL show every active share of the owner with its URL, visibility, expiry, size and creation time, newest first. It SHALL filter by path text. Each row SHALL offer copy link, edit and delete.
+
+#### Scenario: Filter
+- **WHEN** the owner types `2026` into the filter
+- **THEN** only shares whose path contains `2026` are listed
+
+### Requirement: Edit settings
+Edit SHALL let the owner change a share's path, visibility, password and expiry. The upload rules for paths apply.
+
+#### Scenario: Change path
+- **WHEN** the owner changes a path from `a` to `b`
+- **THEN** the share is served at `/b/` and `/a/` returns 404
+
+### Requirement: Trash tab
+The list page SHALL have a trash tab showing trashed shares with the number of days left before purge, a restore action and a purge action that asks for confirmation.
+
+#### Scenario: Days left
+- **WHEN** a share was trashed 10 days ago
+- **THEN** the trash tab shows 20 days left
+
+### Requirement: Language and theme
+The admin UI SHALL be available in English and Traditional Chinese (`zh-TW`). The theme SHALL be dark by default, with a light option. On first sign-in, the language SHALL default to the best match of `Accept-Language`, falling back to English. The choice SHALL be saved on the user record and apply on every device.
+
+#### Scenario: Saved on the server
+- **WHEN** the owner switches to light theme and `zh-TW` on one device and then signs in on another
+- **THEN** the second device shows the light theme in `zh-TW`
+
+### Requirement: Mobile layout
+Every admin page SHALL work on a 360 px wide screen without horizontal scrolling. On devices without folder selection, the page SHALL offer file and zip selection.
+
+#### Scenario: Phone upload
+- **WHEN** the owner opens the upload page on a phone and picks a zip
+- **THEN** the upload completes the same way as on desktop

@@ -1,0 +1,17 @@
+schema: spec-driven
+
+context: |
+  dropgo is an open-source, single-owner web app for sharing HTML and Markdown
+  as web pages. Rust (axum, askama, htmx, sqlx/Postgres, object_store).
+  All docs, specs and code comments are in English. README ships in English
+  (README.md) and Traditional Chinese, Taiwan usage (README.zh-TW.md).
+  Human-facing docs are short, plain and skimmable: lead with the point,
+  numbered steps, no filler.
+
+rules:
+  proposal:
+    - Keep it under one page. Plain sentences, no marketing tone.
+  design:
+    - State each decision with the reason, and the rejected alternative when there was a real one, in one or two lines.
+  specs:
+    - Only requirements a test could check. No implementation details.

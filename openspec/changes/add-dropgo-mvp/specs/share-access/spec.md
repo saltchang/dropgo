@@ -1,0 +1,105 @@
+## ADDED Requirements
+
+### Requirement: Visibility modes
+Each share SHALL have exactly one visibility: `public`, `password` or `owner`. New shares SHALL default to `owner`.
+
+#### Scenario: Public share
+- **WHEN** a signed-out visitor opens a public share
+- **THEN** the content is returned with status 200
+
+#### Scenario: Owner-only share, another user
+- **WHEN** a user who is signed in but does not own the share opens an owner-only share
+- **THEN** the response is 404
+
+#### Scenario: Owner-only share, the owner
+- **WHEN** the share's owner, signed in on the share host, opens it
+- **THEN** the content is returned with status 200, including its images and stylesheets
+
+### Requirement: Share root serves the entry
+A request for `/<path>/` SHALL return the share's entry file. If the entry is Markdown, the rendered page SHALL be returned.
+
+#### Scenario: Single-file share
+- **WHEN** a visitor opens the link of a share created from `notes.md`
+- **THEN** the rendered `notes.md` is shown
+
+### Requirement: Password unlock
+A password share SHALL show a form on page navigation until the visitor enters the right password. Other requests to a locked share SHALL get 401. A request without `Sec-Fetch-Mode` SHALL count as a page navigation when its `Accept` header includes `text/html`. A correct password SHALL set an unlock cookie for that share that lasts 7 days and works for every URL of the share, including downloads and any capitalization of the share path. Changing the password SHALL invalidate existing unlock cookies. The signed-in owner SHALL skip the form.
+
+#### Scenario: Correct password
+- **WHEN** a visitor submits the right password
+- **THEN** they are redirected to the URL they first opened on the same host, and the share and its subresources load
+
+#### Scenario: Direct file link
+- **WHEN** a visitor opens `/doc/report.pdf` of a locked share and submits the right password
+- **THEN** they land on `/doc/report.pdf`
+
+#### Scenario: Locked subresource
+- **WHEN** a request for an image in a locked share is not a page navigation
+- **THEN** the response is 401
+
+#### Scenario: Download after unlock
+- **WHEN** an unlocked visitor follows a download link of that share
+- **THEN** the download starts without the form
+
+#### Scenario: Password changed
+- **WHEN** the owner changes the password and a visitor returns with an old unlock cookie
+- **THEN** the form is shown again
+
+#### Scenario: Owner bypass
+- **WHEN** the signed-in owner opens their own password share
+- **THEN** the content is returned without the form
+
+### Requirement: Password attempt limit
+The system SHALL allow at most 5 wrong passwords per minute for each client IP and share. Further attempts SHALL get 429.
+
+#### Scenario: Sixth wrong attempt
+- **WHEN** one IP submits 6 wrong passwords to one share within a minute
+- **THEN** the sixth attempt gets 429, even if that password is correct
+
+### Requirement: Uploaded content is sandboxed
+Every response that serves uploaded or rendered content, including downloads, SHALL carry `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads` without `allow-same-origin`, plus `X-Content-Type-Options: nosniff`. Downloads SHALL also carry `Content-Disposition: attachment`. The Content-Type SHALL come from the file extension. dropgo's own pages, including the password form served at a share URL, SHALL NOT be able to load scripts.
+
+#### Scenario: Script tries to read cookies
+- **WHEN** an uploaded page runs `document.cookie`
+- **THEN** it throws a SecurityError
+
+#### Scenario: Script tries to call the admin host
+- **WHEN** an uploaded page sends a `fetch` POST with credentials to the admin host
+- **THEN** the admin host does not apply the change
+
+#### Scenario: HTML download
+- **WHEN** the `html` download of a Markdown share that contains a `<script>` tag is requested
+- **THEN** the response has `Content-Disposition: attachment` and the sandbox CSP
+
+### Requirement: No indexing
+Every share host response SHALL carry `X-Robots-Tag: noindex, nofollow, noarchive`. The share host SHALL NOT serve a `robots.txt` that blocks crawling, so crawlers can see that header.
+
+#### Scenario: Header on a public share
+- **WHEN** any file of a public share is requested
+- **THEN** the response has the `X-Robots-Tag` header
+
+### Requirement: Status for missing or ended shares
+The share host SHALL return 410 with a short page for an expired or trashed share, 404 for a path that matches no share, and a 301 from `/<path>` to `/<path>/` for a share root without a trailing slash. When a URL matches both an active share and a trashed one, the active share SHALL serve it.
+
+#### Scenario: Expired share
+- **WHEN** a visitor opens a share whose expiry time has passed
+- **THEN** the response is 410, even if the hourly job has not run yet
+
+#### Scenario: Active share over a trashed one
+- **WHEN** a trashed share is at `notes/2026`, an active share is at `notes` with a `2026/` directory, and a visitor opens `/notes/2026/`
+- **THEN** the active share serves its `2026/` directory
+
+#### Scenario: Purged share
+- **WHEN** a visitor opens the path of a share that was purged
+- **THEN** the response is 404
+
+#### Scenario: Missing trailing slash
+- **WHEN** a visitor opens `/notes/2026`
+- **THEN** the response is a 301 to `/notes/2026/`
+
+### Requirement: Path lookup is case-insensitive for the share path only
+The share path part of a URL SHALL match regardless of case. File paths inside a share SHALL match exactly.
+
+#### Scenario: Uppercase share path
+- **WHEN** a visitor opens `/Notes/2026/Img/A.png` and the share is `notes/2026` with a file `Img/A.png`
+- **THEN** the file is served
