@@ -87,9 +87,21 @@ A share path SHALL be 1 to 8 segments of lowercase `[a-z0-9-_]`, each 1 to 64 ch
 - **WHEN** a share at `notes` has expired but the hourly job has not run, and the owner uploads to `notes`
 - **THEN** the old share moves to the trash and the new upload succeeds
 
-#### Scenario: Retry after a dropped connection
-- **WHEN** the owner's upload to `notes` is cut off and the owner uploads to `notes` again right away
-- **THEN** the new upload succeeds
+#### Scenario: Connection drops during the transfer
+- **WHEN** the owner's upload to `notes` is cut off before the server has received it all, and the owner uploads to `notes` again
+- **THEN** no share was created by the first attempt and the new upload succeeds
+
+#### Scenario: Connection drops after the transfer
+- **WHEN** the connection drops after the server has received the whole upload to `notes`
+- **THEN** the share at `notes` is still created, and a new upload to `notes` gets the overwrite prompt
+
+#### Scenario: Retry while the first upload is still being written
+- **WHEN** the owner uploads to `notes` again without confirming an overwrite, and the first upload to `notes` becomes active before the second one claims the path
+- **THEN** the second upload is rejected with the overwrite prompt and the first share is unchanged
+
+#### Scenario: Server shutdown during writing
+- **WHEN** the server gets SIGTERM while an upload task is writing files
+- **THEN** the server finishes that upload before it exits
 
 #### Scenario: Two uploads at once
 - **WHEN** two uploads claim `a` and `a/b` at the same time

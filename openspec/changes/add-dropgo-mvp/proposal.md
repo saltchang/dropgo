@@ -13,7 +13,7 @@ This is a new project with no existing code or specs.
 - Shares can have an expiry date; the default is never. An expired share returns 410 and moves to the trash. Trash items are deleted 30 days after they enter it.
 - Every share response carries noindex headers.
 - List page with edit, delete, a trash tab and restore.
-- UI in English and Traditional Chinese, dark theme by default. The owner's language and theme are stored on the server.
+- UI in English and Traditional Chinese, dark theme by default. The owner's language and theme are stored on the server. Visitors can switch dark and light on share pages, and their choice is kept in a browser cookie.
 - Storage is S3-compatible or local disk. The database is Postgres.
 
 ## Capabilities

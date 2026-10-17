@@ -7,7 +7,7 @@
 ## 2. Project skeleton
 
 - [ ] 2.1 `cargo new dropgo`, add the crates named in design.md with `cargo add`, and use rustls only
-- [ ] 2.2 Config through clap with the env feature: origins, OIDC, owners, secret, database URL, object store URL, size limit, trusted proxies
+- [ ] 2.2 Config through clap with the env feature: origins, OIDC, owners, secret, database URL, object store URL, size limit, temp dir, trusted proxies
 - [ ] 2.3 Routing by host, with 404 for unknown hosts and `/_dropgo/healthz` on any host
 - [ ] 2.4 sqlx migration for `users`, `identities` (unique `(issuer, subject)`) and `shares` (partial unique index on active paths), and call the session store's own migrate
 - [ ] 2.5 object_store setup from a URL (`s3://`, `file://`, `memory://`)
@@ -25,7 +25,7 @@
 
 - [ ] 4.1 Share path parser and validator, with unit tests for the path rules
 - [ ] 4.2 Path claim under `pg_advisory_xact_lock`: trash conflicting expired shares, then check prefixes. Test it with two uploads at once
-- [ ] 4.3 Upload handler and spawned upload task, as in design "Uploads", with tests for the limits and for a dropped connection
+- [ ] 4.3 Upload handler and tracked upload task, as in design "Uploads", with tests for the limits, a drop before and after the transfer, shutdown during writing, cleanup after a lost claim, and two overwrites at once
 - [ ] 4.4 After the ignore rules, strip a single top-level directory, then detect the entry file
 - [ ] 4.5 Server-side zip unpacking and ignore rules, as in design "Uploads"
 - [ ] 4.6 Overwrite: switch `upload_id`, then delete the old prefix, with a test where a store write fails partway
@@ -42,14 +42,15 @@
 ## 6. Markdown and downloads
 
 - [ ] 6.1 comrak render at upload with syntect highlighting, stored under `<upload-id>/rendered/`
-- [ ] 6.2 Page template with the dark stylesheet, the download footer, plus vendored mermaid and KaTeX as classic scripts
+- [ ] 6.2 Page template with the dark and light stylesheet, the download footer with a theme toggle, plus vendored mermaid and KaTeX as classic scripts
 - [ ] 6.3 Download endpoint for `zip`, `source` and `html`, using the same access check
-- [ ] 6.4 `dropgo rerender` subcommand
-- [ ] 6.5 Tests for the markdown-rendering scenarios
+- [ ] 6.4 `/_dropgo/theme` endpoint, theme cookie, and serving `data-theme` from the owner record, then the cookie, then dark
+- [ ] 6.5 `dropgo rerender` subcommand
+- [ ] 6.6 Tests for the markdown-rendering scenarios and the visitor theme scenarios
 
 ## 7. Lifecycle
 
-- [ ] 7.1 Hourly job, as in design "Lifecycle"
+- [ ] 7.1 Hourly job with conditional writes and the `purging` state, as in design "Lifecycle"
 - [ ] 7.2 Delete, restore (through the same path claim as 4.2, clearing a past expiry) and purge actions
 - [ ] 7.3 Tests for every scenario in the share-lifecycle spec, with the clock injected
 
@@ -64,7 +65,7 @@
 
 ## 9. Docs and release
 
-- [ ] 9.1 README.md in English: what it is, quick start with docker compose (Postgres, a local store and any OIDC provider), the env var table, and the reverse proxy notes, including the body size limit
+- [ ] 9.1 README.md in English: what it is, quick start with docker compose (Postgres, a local store and any OIDC provider), the env var table, and deployment notes: the reverse proxy body size limit, a writable temp dir with room for concurrent uploads (an emptyDir on Kubernetes), and a termination grace period long enough to finish uploads
 - [ ] 9.2 README.zh-TW.md with the same content in Traditional Chinese (Taiwan usage)
 - [ ] 9.3 Edit both READMEs with the humanizer skill, the i-have-adhd writing rules and the ponytail rules
 - [ ] 9.4 MIT LICENSE, then tag v0.1.0

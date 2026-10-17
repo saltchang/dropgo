@@ -103,3 +103,30 @@ The share path part of a URL SHALL match regardless of case. File paths inside a
 #### Scenario: Uppercase share path
 - **WHEN** a visitor opens `/Notes/2026/Img/A.png` and the share is `notes/2026` with a file `Img/A.png`
 - **THEN** the file is served
+
+### Requirement: Visitor theme
+dropgo's own pages on the share host (rendered Markdown, the password form, error pages) SHALL offer a dark and light toggle that works without scripts. The theme SHALL be the choice kept in a browser cookie, else the signed-in owner's saved theme, else dark. The toggle SHALL only write the browser cookie. Uploaded HTML SHALL get no toggle. These pages SHALL carry `Cache-Control: private`.
+
+#### Scenario: Visitor switches theme
+- **WHEN** a signed-out visitor switches a rendered page to light and later opens another share
+- **THEN** both pages are shown in light
+
+#### Scenario: Default
+- **WHEN** a visitor with no theme cookie opens a rendered page
+- **THEN** it is shown in dark
+
+#### Scenario: Owner default on the share host
+- **WHEN** the signed-in owner, whose saved theme is light and who has no theme cookie, opens a rendered page
+- **THEN** it is shown in light
+
+#### Scenario: Cross-site toggle
+- **WHEN** another site embeds `<img src="https://s.example.com/_dropgo/theme?set=light">` and the signed-in owner opens it
+- **THEN** the owner's saved theme does not change
+
+#### Scenario: Not cached across visitors
+- **WHEN** a rendered page is requested
+- **THEN** the response has `Cache-Control` with `private`
+
+#### Scenario: Foreign return path
+- **WHEN** the toggle is called with `back=//evil.example/`
+- **THEN** the browser is sent to `/` of the share host

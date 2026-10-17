@@ -38,7 +38,7 @@ Edit SHALL let the owner change a share's path, visibility, password and expiry.
 - **THEN** the share is served at `/b/` and `/a/` returns 404
 
 ### Requirement: Trash tab
-The list page SHALL have a trash tab showing trashed shares with the number of days left before purge, a restore action and a purge action that asks for confirmation.
+The list page SHALL have a trash tab showing trashed shares with the number of days left before purge, a restore action and a purge action that asks for confirmation. A share being purged SHALL be shown as deleting, without restore or purge actions.
 
 #### Scenario: Days left
 - **WHEN** a share was trashed 10 days ago

@@ -106,7 +106,7 @@ Objects live under `shares/<share-id>/<upload-id>/files/<path>` for originals an
 
 The app renders every `.md` file at upload time with comrak (GFM extensions, raw HTML allowed). A request for `notes.md` serves the rendered page, so links between `.md` files work with no rewriting. Raw HTML in Markdown is safe enough because the page is sandboxed.
 
-Mermaid and KaTeX are vendored and served from `/_dropgo/assets/`. Rendered pages use dropgo's own dark stylesheet and end with a footer of download links. Uploaded HTML is served byte for byte unchanged.
+Mermaid and KaTeX are vendored and served from `/_dropgo/assets/`. Rendered pages use dropgo's own stylesheet, which has a dark and a light theme, and end with a footer that has download links and a theme toggle. Every stored page starts with the fixed prefix `<!doctype html><html data-theme="dark">`. When serving, the server rewrites only that prefix, so a `data-theme` inside the user's content is never touched. Rendered pages and dropgo's own pages carry `Cache-Control: private, no-cache`, because the same URL returns a different page per theme cookie. Uploaded HTML is served byte for byte unchanged.
 
 `dropgo rerender` rebuilds the rendered files of every share that has not been purged, including trashed ones, after a template or comrak upgrade.
 
@@ -118,7 +118,7 @@ Rejected: rendering on each request. Rendering at upload time keeps request hand
 
 - `zip` packs the original files.
 - `source` returns the original file of a single-file share.
-- `html` returns the rendered entry of a Markdown share as one file with the CSS inlined. Mermaid and KaTeX are loaded from a pinned jsDelivr URL, because inlining them would add about 3 MB. Relative image links stay relative.
+- `html` returns the rendered entry of a Markdown share as one file with the dark CSS inlined and without the footer. Mermaid and KaTeX are loaded from a pinned jsDelivr URL, because inlining them would add about 3 MB. Relative image links stay relative.
 
 ### Uploads
 
@@ -128,20 +128,20 @@ The browser reads a dropped folder, applies the ignore rules with the npm `ignor
 
 The server rejects any relative path that is absolute or contains `..`, `\`, NUL or an empty segment. Limits are `DROPGO_MAX_SHARE_BYTES` (default 100 MB), counted after unzip, and 10,000 files. axum's `DefaultBodyLimit` is set to that limit plus 1 MB for multipart overhead. The README says the reverse proxy needs the same limit.
 
-The server checks the path without a lock first, so an obvious conflict fails before the transfer. It receives the whole upload into a temp directory, then hands the rest to a `tokio::spawn` task, because a dropped connection cancels the handler but not a spawned task. The task writes the files to the object store, then claims the path under the lock and inserts the row as `active`. If the claim fails, the task deletes the files it wrote. On overwrite, the active row keeps serving the old `upload_id` until every new file is written. Then the row switches to the new one and the old prefix is deleted. If the form leaves the password empty, the existing password stays.
+The server checks the path without a lock first, so an obvious conflict fails before the transfer. It receives the whole upload into a temp directory under `DROPGO_TMP_DIR` (default `TMPDIR`), then hands the rest to a `tokio::spawn` task, because a dropped connection cancels the handler but not a spawned task. Upload tasks are tracked with `tokio_util::task::TaskTracker`, and shutdown waits for them, so a rolling update does not cut one off. The task writes the files to the object store, then claims the path under the lock and inserts the row as `active`. For an overwrite, the claim transaction reads the `upload_id` being replaced, so two overwrites at once each delete only what they replaced. The claim carries whether the owner confirmed an overwrite. An active share at the path, even one the owner's earlier upload created after the pre-check, fails an unconfirmed claim with a conflict that offers the overwrite. If the claim fails, the task deletes the files it wrote. On overwrite, the active row keeps serving the old `upload_id` until every new file is written. Then the row switches to the new one and the old prefix is deleted. If the form leaves the password empty, the existing password stays.
 
 Rejected: uploading straight from the browser to S3 with presigned URLs. That would not work with the local disk backend, and it moves zip handling to the browser.
 
 ### Lifecycle
 
-States are `active` and `trashed`. A share is expired when `expires_at <= now()`. That check runs on every request, so a share stops working at its expiry time and does not wait for the job.
+States are `active`, `trashed` and `purging`. A share is expired when `expires_at <= now()`. That check runs on every request, so a share stops working at its expiry time and does not wait for the job.
 
 An hourly in-process job does two things. Both are safe to run twice at once, so the job takes no lock. Each share gets its own short transaction, so a share that fails is logged and skipped and does not block the rest.
 
 1. It trashes expired active shares.
 2. It purges trashed shares 30 days after `trashed_at`.
 
-Purging deletes the `shares/<share-id>/` prefix first and the row second, so a failed delete is retried on the next run.
+Every job write re-checks its condition, so an owner edit in between wins: trashing is `UPDATE ... WHERE id = $1 AND state = 'active' AND expires_at <= now()`. Purging first sets `state = 'purging'` with `WHERE state = 'trashed' AND trashed_at <= now() - interval '30 days'`, then deletes the `shares/<share-id>/` prefix, then the row. Each run picks up rows already in `purging` as well, so a failed delete is retried on the next run. The owner's manual purge follows the same steps. Restore only accepts `trashed`, so it cannot race a purge. A `purging` share answers 410 like a trashed one.
 
 A trashed share keeps its `path` so that its URL returns 410, but it does not count for the unique index or the prefix check. A new upload can take that path. Restoring a share fails if its path now conflicts, and the UI then asks for a new path. Restore clears an expiry that is in the past.
 
@@ -151,7 +151,7 @@ Rejected: a Kubernetes CronJob for the job. It would be a second deployment unit
 
 ### Password unlock
 
-Each unlocked share gets its own cookie, `__Host-dropgo-unlock-<share-id>`. The cookie holds an HMAC of `(share_id, password_hash, expires_at)` signed with `DROPGO_SECRET` and lasts 7 days. Naming the cookie by share id keeps `Path=/`, which the `__Host-` prefix requires. It also means the cookie works however the visitor capitalizes the path. Setting a password stores a new argon2 hash with a fresh salt, which invalidates old cookies without a sessions table. A signed-in owner skips the form.
+Each unlocked share gets its own cookie, `__Host-dropgo-unlock-<share-id>`. The cookie holds an HMAC of `(share_id, password_hash, expires_at)` signed with `DROPGO_SECRET` and lasts 7 days. Naming the cookie by share id keeps `Path=/`, which the `__Host-` prefix requires. It also means the cookie works however the visitor capitalizes the path. Setting a password stores a new argon2 hash with a fresh salt, which invalidates old cookies without a sessions table. The hash is only recomputed when the owner sets a password, never on verify, so tuning argon2 parameters does not log visitors out. A signed-in owner skips the form.
 
 Wrong passwords are limited to 5 per minute per client IP and share, counted in memory. The client IP is the right-most `X-Forwarded-For` hop that is not in `DROPGO_TRUSTED_PROXIES`.
 
@@ -159,9 +159,13 @@ Rejected: a server-side unlock table. The signed cookie needs no cleanup job.
 
 ### Preferences and i18n
 
-`users.locale` (`en`, `zh-TW`) and `users.theme` (`dark`, `light`) are set at first sign-in to `dark` and to the best match of `Accept-Language`. A small toggle in the nav saves changes. Share host pages are dark and follow `Accept-Language`, because visitors have no user row. Strings live in two embedded TOML catalogs, and a test fails if their key sets differ.
+`users.locale` (`en`, `zh-TW`) and `users.theme` (`dark`, `light`) are set at first sign-in to `dark` and to the best match of `Accept-Language`. The admin UI uses them, and a small toggle in its nav saves changes. Strings live in two embedded TOML catalogs, and a test fails if their key sets differ.
 
-Rejected: a cookie for preferences. The owner asked for preferences that follow them across devices.
+Share host pages follow `Accept-Language` for language. Their theme comes from a `__Host-dropgo-theme` cookie (`SameSite=Lax`, one year), else from the signed-in owner's `users.theme`, else dark. The toggle is a plain link to `/_dropgo/theme?set=light&back=<path>`. It writes only the cookie and sends a 303 back to `back`, a same-host path checked like the sign-in return URL. It never writes `users.theme`, because any site can trigger a GET on the share host with the owner's `SameSite=None` session, and sandboxed pages send `Origin: null`, so an Origin check cannot tell them apart from an attacker. Rendered pages are sandboxed, so their scripts cannot touch storage or cookies, but a link the server handles works anyway. The Lax cookie still arrives on the page request, because that is a top-level navigation. Uploaded HTML gets no toggle, because it is served unchanged.
+
+Rejected: localStorage for visitors. The sandbox makes it throw in rendered pages.
+
+Rejected: a cookie for the owner's admin preferences. The owner asked for preferences that follow them across devices.
 
 ### Data model
 
@@ -196,7 +200,7 @@ erDiagram
 
 - [Browsers may not send `SameSite=None` cookies on subresource requests from a sandboxed page, especially when third-party cookies are blocked or under Safari ITP] → The PoC covers Chromium, Firefox and WebKit in Playwright, Chrome with third-party cookies blocked, and real Safari on macOS or iOS. If one fails, the fallback is a short-lived signed token in the query string of asset URLs. That fallback changes the share-access spec.
 - [Authelia's session cookie also reaches the share host] → Scripts in sandboxed pages cannot read it, and their requests do not carry Lax cookies. dropgo never reads it.
-- [A crash while the upload task writes files leaves objects with no row] → `shortcut:` rare with one owner. Add a sweep that deletes prefixes with no row if it shows up.
+- [A crash while the upload task writes files, or a failed delete after a lost claim, leaves objects with no row] → `shortcut:` rare with one owner. Add a sweep that deletes prefixes with no row if it shows up.
 - [Overwrite can leave orphan objects if the delete fails] → They stay under the share prefix, and purge removes that prefix. `shortcut:` orphans live as long as the share, so add a sweep job if storage cost matters.
 - [The rate limit is in memory, per process] → `shortcut:` it is only correct with one replica. Move it to Postgres before running more.
 - [Each unlocked share adds a cookie of about 120 bytes] → `shortcut:` a visitor who unlocks about 60 shares within 7 days can exceed an 8 KB header limit at the proxy. Switch to one signed cookie with a list of share ids if that happens.

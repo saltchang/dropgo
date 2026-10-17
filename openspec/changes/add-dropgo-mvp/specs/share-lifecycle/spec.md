@@ -15,6 +15,10 @@ Each share SHALL have an optional expiry time. The default is none, which means 
 - **WHEN** the owner changes an expiry to "never" before it passes
 - **THEN** the share stays available
 
+#### Scenario: Extend while the job runs
+- **WHEN** the job has selected an expired share and the owner sets its expiry to "never" before the job writes
+- **THEN** the share stays active
+
 ### Requirement: Expired shares move to the trash
 A job SHALL run at least hourly and move every expired active share to the trash. The trashed share SHALL keep its path so that its URL returns 410.
 
@@ -51,6 +55,10 @@ The owner SHALL be able to restore a trashed share. Restore SHALL follow the sam
 - **WHEN** the owner restores a share whose path is now used by another share
 - **THEN** the share stays in the trash and the UI asks for a new path
 
+#### Scenario: Restore during purge
+- **WHEN** the owner restores a share that the job has started to purge
+- **THEN** the restore is refused and the share is purged
+
 #### Scenario: Restore races an upload
 - **WHEN** the owner restores a share at `a` while an upload claims `a/b`
 - **THEN** exactly one succeeds
@@ -64,4 +72,4 @@ The job SHALL permanently delete a trashed share and all of its stored files 30 
 
 #### Scenario: Storage error during purge
 - **WHEN** deleting a share's files fails
-- **THEN** the share stays in the trash, the job still trashes and purges the other due shares, and the next run tries again
+- **THEN** the share's URL still returns 410, the restore is refused, the job still trashes and purges the other due shares, and the next run tries again

@@ -27,7 +27,7 @@ Fenced code blocks with a language SHALL be highlighted on the server. Fenced `m
 - **THEN** the HTML response already contains highlight markup before any script runs
 
 ### Requirement: Rendered page layout
-Rendered pages SHALL use dropgo's dark stylesheet, fit a 360 px wide screen without horizontal scrolling, and end with a footer that has download links. Uploaded `.html` files SHALL be served byte for byte unchanged.
+Rendered pages SHALL use dropgo's stylesheet in the visitor's theme (see share-access), fit a 360 px wide screen without horizontal scrolling, and end with a footer that has download links. Uploaded `.html` files SHALL be served byte for byte unchanged.
 
 #### Scenario: HTML is untouched
 - **WHEN** an uploaded `index.html` is requested
@@ -42,7 +42,7 @@ Rendered pages SHALL use dropgo's dark stylesheet, fit a 360 px wide screen with
 
 #### Scenario: Standalone HTML
 - **WHEN** `format=html` is requested for a Markdown share
-- **THEN** the response is one HTML file with the stylesheet inlined and no reference to the share host
+- **THEN** the response is one HTML file in the dark theme with the stylesheet inlined, no footer and no reference to the share host
 
 #### Scenario: Download of an owner-only share
 - **WHEN** a signed-out visitor requests a download of an owner-only share
