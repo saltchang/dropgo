@@ -466,6 +466,14 @@ pub fn client_ip(cfg: &crate::Config, headers: &HeaderMap, peer: Option<IpAddr>)
     hops.into_iter().rev().find(|ip| !trusted(ip)).unwrap_or(peer)
 }
 
+/// The address guesses are counted under. One IPv6 subscriber gets a whole /64, so it counts as one client.
+fn attempt_ip(ip: IpAddr) -> IpAddr {
+    match ip.to_canonical() {
+        IpAddr::V6(v6) => IpAddr::V6((u128::from(v6) & !((1u128 << 64) - 1)).into()),
+        v4 => v4,
+    }
+}
+
 /// Counts guesses in the last minute and records this one, so concurrent guesses share the limit.
 /// Returns false when the limit is reached. `shortcut:` in memory, so only right with one replica.
 fn take_attempt(st: &AppState, key: (IpAddr, Uuid)) -> bool {
@@ -508,7 +516,7 @@ async fn unlock(
     let Some(share) = share.filter(|s| s.live() && s.visibility == "password") else {
         return message(&ctx, StatusCode::NOT_FOUND, "not_found", &back).await;
     };
-    let key = (client_ip(&st.cfg, &ctx.headers, peer.map(|p| p.0.0.ip())), share.id);
+    let key = (attempt_ip(client_ip(&st.cfg, &ctx.headers, peer.map(|p| p.0.0.ip()))), share.id);
     if !take_attempt(&st, key) {
         return message(&ctx, StatusCode::TOO_MANY_REQUESTS, "too_many", &back).await;
     }
@@ -698,6 +706,15 @@ mod tests {
         assert_eq!(client_ip(&cfg, &h, Some(ip("5.5.5.5"))), ip("5.5.5.5"), "an untrusted peer is the client");
         h.insert("x-forwarded-for", "10.0.0.3".parse().unwrap());
         assert_eq!(client_ip(&cfg, &h, Some(ip("10.0.0.1"))), ip("10.0.0.1"), "all hops trusted");
+    }
+
+    #[test]
+    fn attempts_count_per_ipv6_64() {
+        let ip = |s: &str| s.parse::<IpAddr>().unwrap();
+        assert_eq!(attempt_ip(ip("2001:db8:1:2:aaaa::1")), attempt_ip(ip("2001:db8:1:2:bbbb::9")));
+        assert_ne!(attempt_ip(ip("2001:db8:1:2::1")), attempt_ip(ip("2001:db8:1:3::1")));
+        assert_eq!(attempt_ip(ip("::ffff:1.2.3.4")), ip("1.2.3.4"));
+        assert_ne!(attempt_ip(ip("1.2.3.4")), attempt_ip(ip("1.2.3.5")));
     }
 
     #[test]

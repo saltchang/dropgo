@@ -73,11 +73,15 @@ A page navigation that passes the access check for a password or owner-only shar
 - **THEN** no redirect to a token URL happens
 
 ### Requirement: Password attempt limit
-The system SHALL allow at most 5 wrong passwords per minute for each client IP and share. Further attempts SHALL get 429.
+The system SHALL allow at most 5 wrong passwords per minute for each client IP and share. An IPv6 client counts by its /64 prefix, because one subscriber gets a whole /64. Further attempts SHALL get 429.
 
 #### Scenario: Sixth wrong attempt
 - **WHEN** one IP submits 6 wrong passwords to one share within a minute
 - **THEN** the sixth attempt gets 429, even if that password is correct
+
+#### Scenario: IPv6 client changes address
+- **WHEN** a client sends 6 wrong passwords to one share within a minute, each from a different address in the same IPv6 /64
+- **THEN** the sixth attempt gets 429
 
 ### Requirement: Uploaded content is sandboxed
 Every response that serves uploaded or rendered content, including downloads, SHALL carry `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads` without `allow-same-origin`, plus `X-Content-Type-Options: nosniff`. Share file responses SHALL carry `Access-Control-Allow-Origin: *`. Downloads SHALL also carry `Content-Disposition: attachment`. The Content-Type SHALL come from the file extension. dropgo's own pages, including the password form served at a share URL, SHALL NOT be able to load scripts.
