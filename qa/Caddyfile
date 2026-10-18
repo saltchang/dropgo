@@ -1,0 +1,9 @@
+{
+	local_certs
+	https_port 8443
+	http_port 8081
+}
+drop.localhost:8443, s.localhost:8443 {
+	tls internal
+	reverse_proxy 127.0.0.1:8080
+}

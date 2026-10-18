@@ -49,6 +49,29 @@ A password share SHALL show a form on page navigation until the visitor enters t
 - **WHEN** the signed-in owner opens their own password share
 - **THEN** the content is returned without the form
 
+### Requirement: Access token in the path
+A page navigation that passes the access check for a password or owner-only share SHALL be redirected to the same URL under `/_dropgo/t/<token>/`. A request under that prefix SHALL be allowed without cookies when the token is valid for the share it names. A token SHALL last 12 hours and SHALL stop working when the share's password or visibility changes. A page navigation with an invalid or expired token SHALL be redirected to the URL without the prefix; any other request with one SHALL get 401.
+
+#### Scenario: Subresources without cookies
+- **WHEN** an unlocked visitor opens a password share in a browser that sends no cookies on requests from the page
+- **THEN** the page's images, stylesheets and fonts load
+
+#### Scenario: Token for another share
+- **WHEN** a token issued for share `a` is used under the prefix for a URL of share `b`
+- **THEN** the response is 401 for a subresource and a redirect without the prefix for a page navigation
+
+#### Scenario: Expired token
+- **WHEN** a visitor whose unlock cookie is still valid opens a token URL 13 hours after it was issued
+- **THEN** they are redirected to the URL without the prefix and then to a fresh token URL
+
+#### Scenario: Password changed
+- **WHEN** the owner changes the password of a share
+- **THEN** existing token URLs for that share stop working
+
+#### Scenario: Public share
+- **WHEN** a visitor opens a public share
+- **THEN** no redirect to a token URL happens
+
 ### Requirement: Password attempt limit
 The system SHALL allow at most 5 wrong passwords per minute for each client IP and share. Further attempts SHALL get 429.
 
@@ -57,7 +80,7 @@ The system SHALL allow at most 5 wrong passwords per minute for each client IP a
 - **THEN** the sixth attempt gets 429, even if that password is correct
 
 ### Requirement: Uploaded content is sandboxed
-Every response that serves uploaded or rendered content, including downloads, SHALL carry `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads` without `allow-same-origin`, plus `X-Content-Type-Options: nosniff`. Downloads SHALL also carry `Content-Disposition: attachment`. The Content-Type SHALL come from the file extension. dropgo's own pages, including the password form served at a share URL, SHALL NOT be able to load scripts.
+Every response that serves uploaded or rendered content, including downloads, SHALL carry `Content-Security-Policy: sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads` without `allow-same-origin`, plus `X-Content-Type-Options: nosniff`. Share file responses SHALL carry `Access-Control-Allow-Origin: *`. Downloads SHALL also carry `Content-Disposition: attachment`. The Content-Type SHALL come from the file extension. dropgo's own pages, including the password form served at a share URL, SHALL NOT be able to load scripts.
 
 #### Scenario: Script tries to read cookies
 - **WHEN** an uploaded page runs `document.cookie`
@@ -66,6 +89,10 @@ Every response that serves uploaded or rendered content, including downloads, SH
 #### Scenario: Script tries to call the admin host
 - **WHEN** an uploaded page sends a `fetch` POST with credentials to the admin host
 - **THEN** the admin host does not apply the change
+
+#### Scenario: Font in an uploaded page
+- **WHEN** a public share's `index.html` uses a font file from the same share in `@font-face`
+- **THEN** the font loads
 
 #### Scenario: HTML download
 - **WHEN** the `html` download of a Markdown share that contains a `<script>` tag is requested

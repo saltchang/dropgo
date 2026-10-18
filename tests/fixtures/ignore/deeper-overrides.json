@@ -1,0 +1,2 @@
+{"files": {".gitignore": "*.log\n", "logs/.gitignore": "!important.log\n", "logs/important.log": "x", "logs/other.log": "x", "index.md": "x"},
+ "kept": ["index.md", "logs/important.log"]}

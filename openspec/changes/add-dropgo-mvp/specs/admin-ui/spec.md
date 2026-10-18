@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Upload page
-The admin host root SHALL be the upload page. It has a drop zone and file picker at the top and a settings form below it with path, visibility, password (shown only for `password` visibility) and expiry (never, 1 day, 7 days, 30 days, custom date and time). For a folder or a single file, the upload button SHALL stay disabled until the files pass the ignore and entry checks. A zip SHALL be checked by the server, which reports any error on the page.
+The admin host root SHALL be the upload page. It has a drop zone at the top with one button that offers a folder or a single file (an .html, .md or .zip file), and a settings form below it with path, visibility, password and expiry. Visibility offers only `owner` and `public`. The password field is always shown, disabled while visibility is `owner`, and has a button that shows the typed password. A `public` share with a password becomes a `password` share; with the field left empty it stays `public`. Expiry is one date and time field, empty for never, with buttons that fill in 1, 7 or 30 days from now or clear it. For a folder or a single file, the upload button SHALL stay disabled until the files pass the ignore and entry checks. A zip SHALL be checked by the server, which reports any error on the page.
 
 #### Scenario: Successful upload
 - **WHEN** the owner drops a folder, fills the form and presses upload
@@ -17,21 +17,30 @@ The admin host root SHALL be the upload page. It has a drop zone and file picker
 
 #### Scenario: Form defaults
 - **WHEN** the upload page loads
-- **THEN** visibility is `owner` and expiry is never, whatever was chosen last time
+- **THEN** visibility is `owner` and the expiry field is empty, whatever was chosen last time
+
+#### Scenario: Password makes a password share
+- **WHEN** the owner picks `public` and types a password
+- **THEN** the share is created with `password` visibility
 
 #### Scenario: Overwrite prompt
 - **WHEN** the entered path belongs to one of the owner's active shares
 - **THEN** the form fills in that share's visibility and expiry and asks for confirmation before uploading
+- **AND** for a password share, an empty password field keeps the existing password
 
 ### Requirement: Share list
-A list page reachable from the top nav SHALL show every active share of the owner with its URL, visibility, expiry, size and creation time, newest first. It SHALL filter by path text. Each row SHALL offer copy link, edit and delete.
+A list page reachable from the top nav SHALL show every active share of the owner with its URL, visibility, entry file, type (HTML or Markdown), expiry, size and creation time, newest first. A search field SHALL match, as the owner types, any of the text a row shows. Two date fields SHALL limit the list to shares created in that range, in the browser's time zone. Each row SHALL offer copy link, edit and delete.
 
-#### Scenario: Filter
-- **WHEN** the owner types `2026` into the filter
-- **THEN** only shares whose path contains `2026` are listed
+#### Scenario: Search
+- **WHEN** the owner types `markdown` into the search
+- **THEN** only Markdown shares are listed
+
+#### Scenario: Date range
+- **WHEN** the owner sets a date range with no shares created in it
+- **THEN** the list shows that nothing matches
 
 ### Requirement: Edit settings
-Edit SHALL let the owner change a share's path, visibility, password and expiry. The upload rules for paths apply.
+Edit SHALL let the owner change a share's path, visibility, password and expiry, with the same fields as the upload page. An empty password field SHALL keep the current password, and a checkbox SHALL remove it. Leaving the expiry field as it was SHALL keep the expiry. The upload rules for paths apply.
 
 #### Scenario: Change path
 - **WHEN** the owner changes a path from `a` to `b`

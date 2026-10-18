@@ -1,0 +1,2 @@
+{"files": {".dockerignore": "*.md\n/notes.txt\n", "a.md": "x", "sub/b.md": "x", "notes.txt": "x", "sub/notes.txt": "x", "index.html": "x"},
+ "kept": ["index.html", "sub/b.md", "sub/notes.txt"]}

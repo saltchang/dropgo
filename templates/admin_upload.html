@@ -1,0 +1,78 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ l.t.s("nav.upload") }}{% endblock %}
+{% block content %}
+<div class="page-head">
+<h1>{{ l.t.s("upload.heading") }}</h1>
+<p class="lead">{{ l.t.s("upload.lead") }}</p>
+</div>
+
+<section id="drop" class="drop" data-max-bytes="{{ max_bytes }}">
+<div class="drop-icon">{{ crate::icons::icon("upload")|safe }}</div>
+<p class="drop-hint">{{ l.t.s("upload.drop_hint") }}</p>
+<p class="drop-limit">{{ l.t.s("upload.limit").replace("{}", max_size.as_str()) }}</p>
+<details class="picker" id="picker">
+<summary class="button primary">{{ crate::icons::icon("upload")|safe }}{{ l.t.s("upload.pick") }}{{ crate::icons::icon("chevron-down")|safe }}</summary>
+<div class="picker-menu">
+<label id="folder-label">{{ crate::icons::icon("folder")|safe }}{{ l.t.s("upload.pick_folder") }}<input type="file" id="pick-folder" webkitdirectory multiple hidden></label>
+<label>{{ crate::icons::icon("file")|safe }}{{ l.t.s("upload.pick_file") }}<input type="file" id="pick-file" accept=".html,.htm,.md,.zip,text/html,text/markdown,application/zip" hidden></label>
+</div>
+</details>
+<div class="picked">{{ crate::icons::icon("check-circle")|safe }}<p id="summary" class="summary" aria-live="polite"></p></div>
+<details id="skipped" hidden><summary></summary><ul></ul></details>
+</section>
+
+<form id="upload-form" class="card stack" novalidate>
+<label>{{ l.t.s("form.path") }}
+{# one-time-code: Chromium never takes such a field for the username of the new-password form, so Brave offers no email alias here. #}
+<span class="path-input"><span class="prefix"><bdi>{{ share_origin }}/</bdi></span><input id="path" autocomplete="one-time-code" spellcheck="false" placeholder="{{ l.t.s("form.path_placeholder") }}"></span>
+</label>
+<p id="path-msg" class="hint" aria-live="polite"></p>
+<div class="grid-2">
+<label>{{ l.t.s("form.visibility") }}
+<select name="visibility" id="visibility">
+<option value="owner" selected>{{ l.t.s("visibility.owner") }}</option>
+<option value="public">{{ l.t.s("visibility.public") }}</option>
+</select>
+</label>
+<div class="field" data-disable-if="visibility=owner">
+<label for="password">{{ l.t.s("form.password") }}</label>
+<span class="secret"><input type="password" name="password" id="password" autocomplete="new-password" placeholder="{{ l.t.s("form.password_hint") }}"><button type="button" class="icon-button reveal" data-reveal="password" aria-pressed="false" title="{{ l.t.s("form.show_password") }}" aria-label="{{ l.t.s("form.show_password") }}">{{ crate::icons::icon("eye")|safe }}{{ crate::icons::icon("eye-off")|safe }}</button></span>
+</div>
+</div>
+<div class="field">
+<label for="expires-local">{{ l.t.s("form.expiry") }}</label>
+<div class="expiry">
+<input type="datetime-local" id="expires-local">
+<div class="chips">
+<button type="button" class="chip" data-days="1">{{ l.t.s("expiry.1d") }}</button>
+<button type="button" class="chip" data-days="7">{{ l.t.s("expiry.7d") }}</button>
+<button type="button" class="chip" data-days="30">{{ l.t.s("expiry.30d") }}</button>
+<button type="button" class="chip" data-days="0">{{ l.t.s("expiry.never") }}</button>
+</div>
+</div>
+<p class="hint">{{ l.t.s("form.expiry_hint") }}</p>
+</div>
+<div id="overwrite" class="notice" hidden>
+{{ crate::icons::icon("alert")|safe }}
+<div>
+<p id="overwrite-msg"></p>
+<label class="check"><input type="checkbox" id="overwrite-ok"> {{ l.t.s("upload.overwrite_confirm") }}</label>
+</div>
+</div>
+<button type="submit" id="submit" class="primary" disabled>{{ crate::icons::icon("upload")|safe }}{{ l.t.s("upload.submit") }}</button>
+<progress id="progress" max="1" value="0" hidden></progress>
+<p id="error" class="error" role="alert"></p>
+</form>
+
+<section id="done" class="card done" hidden>
+<div class="done-icon">{{ crate::icons::icon("check-circle")|safe }}</div>
+<p class="done-title">{{ l.t.s("upload.done") }}</p>
+<div class="copy-row"><input id="share-url" readonly><button type="button" class="primary" data-copy="share-url">{{ crate::icons::icon("copy")|safe }}<span class="label">{{ l.t.s("action.copy") }}</span></button></div>
+<div class="row center">
+<a id="share-link" class="button secondary" href="#" target="_blank" rel="noopener">{{ crate::icons::icon("external")|safe }}{{ l.t.s("action.open") }}</a>
+<a class="button secondary" href="/">{{ crate::icons::icon("plus")|safe }}{{ l.t.s("upload.another") }}</a>
+</div>
+</section>
+<script type="application/json" id="strings">{{ strings|safe }}</script>
+<script type="module" src="/_dropgo/assets/upload.mjs"></script>
+{% endblock %}

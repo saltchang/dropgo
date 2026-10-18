@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="{{ t.locale }}" data-theme="{{ theme }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% block title %}{% endblock %} · dropgo</title>
+<link rel="stylesheet" href="/_dropgo/assets/dropgo.css">
+</head>
+<body class="dropgo-page">
+<main class="card">
+{% block content %}{% endblock %}
+</main>
+<footer class="dropgo-footer"><nav><span class="dropgo-mark">{{ crate::icons::icon("download")|safe }}dropgo</span><a class="dropgo-theme" href="{{ toggle }}">{% if theme == "dark" %}{{ crate::icons::icon("sun")|safe }}{{ t.s("theme.to_light") }}{% else %}{{ crate::icons::icon("moon")|safe }}{{ t.s("theme.to_dark") }}{% endif %}</a></nav></footer>
+</body>
+</html>

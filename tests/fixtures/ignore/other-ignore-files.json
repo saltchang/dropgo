@@ -1,0 +1,2 @@
+{"files": {".ignore": "*.md\n", ".npmignore": "*.md\n", "a.md": "x", "index.html": "x"},
+ "kept": ["a.md", "index.html"]}

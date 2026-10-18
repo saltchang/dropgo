@@ -1,0 +1,2 @@
+{"files": {".gitignore": "/tmp\n**/cache/*.bin\n", "tmp/a.md": "x", "sub/tmp/b.md": "x", "x/cache/c.bin": "x", "cache/d.bin": "x", "index.md": "x"},
+ "kept": ["index.md", "sub/tmp/b.md"]}

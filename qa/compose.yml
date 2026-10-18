@@ -1,0 +1,39 @@
+# Local QA stack: HTTPS through Caddy, Postgres, a mock OIDC provider and dropgo built from this repo.
+# Host networking keeps the cookie hosts (drop.localhost, s.localhost) and the issuer URL the same
+# for the browser and the app.
+name: dropgo-qa
+services:
+  db:
+    image: postgres:17-alpine
+    network_mode: host
+    environment: { POSTGRES_PASSWORD: pw, PGPORT: "55432" }
+  idp:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    network_mode: host
+    environment: { SERVER_PORT: "18080", JSON_CONFIG: '{"interactiveLogin":true,"loginPagePath":"/login.html"}' }
+    volumes: ["./login.html:/login.html:ro"]
+  caddy:
+    image: caddy:2-alpine
+    network_mode: host
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro"]
+  app:
+    build: ..
+    image: dropgo:dev
+    network_mode: host
+    restart: on-failure
+    depends_on: [db, idp]
+    volumes: ["files:/data"]
+    environment:
+      DROPGO_LISTEN: 127.0.0.1:8080
+      DROPGO_ADMIN_ORIGIN: https://drop.localhost:8443
+      DROPGO_SHARE_ORIGIN: https://s.localhost:8443
+      DROPGO_OIDC_ISSUER: http://localhost:18080/default
+      DROPGO_OIDC_CLIENT_ID: dropgo
+      DROPGO_OIDC_CLIENT_SECRET: x
+      DROPGO_OWNERS: alice
+      DROPGO_SECRET: qa-secret-qa-secret-qa-secret-qa-secret
+      DROPGO_DATABASE_URL: postgres://postgres:pw@127.0.0.1:55432/postgres
+      DROPGO_STORE_URL: file:///data
+      DROPGO_TRUSTED_PROXIES: 127.0.0.1/32
+volumes:
+  files:

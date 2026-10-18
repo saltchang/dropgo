@@ -1,0 +1,2 @@
+{"files": {".env": "x", ".hidden/a.md": "x", "node_modules/x/index.js": "x", "__MACOSX/site/._index.html": "x", "sub/node_modules/y.js": "x", "index.html": "x", "a/.DS_Store": "x"},
+ "kept": ["index.html"]}

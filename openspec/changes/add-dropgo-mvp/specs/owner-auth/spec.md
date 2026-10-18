@@ -12,11 +12,15 @@ Every admin host route except the OIDC callback, `/_dropgo/healthz` and static a
 - **THEN** the upload page is returned with status 200
 
 ### Requirement: Owner allowlist
-The system SHALL allow sign-in only when the configured claim (default `preferred_username`) matches an entry in `DROPGO_OWNERS`. It SHALL check this on every sign-in. Sessions SHALL expire 12 hours after sign-in, whatever the activity.
+The system SHALL allow sign-in only when the configured claim (default `preferred_username`) matches an entry in `DROPGO_OWNERS`. The claim SHALL be read from the ID token, and from the userinfo endpoint when the ID token lacks it; a userinfo response whose `sub` differs from the ID token's SHALL fail the sign-in. It SHALL check this on every sign-in. Sessions SHALL expire 12 hours after sign-in, whatever the activity.
 
 #### Scenario: Allowed user
 - **WHEN** the provider returns an ID token whose `preferred_username` is in `DROPGO_OWNERS`
 - **THEN** a session is created and the browser is redirected to the page it first asked for
+
+#### Scenario: Claim only in userinfo
+- **WHEN** the ID token has no owner claim and the userinfo response for the same `sub` has one in `DROPGO_OWNERS`
+- **THEN** a session is created as for an allowed user
 
 #### Scenario: User not on the allowlist
 - **WHEN** the ID token's claim is not in `DROPGO_OWNERS`

@@ -1,0 +1,63 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ l.t.s("nav.shares") }}{% endblock %}
+{% block content %}
+<div class="page-head row-head">
+<h1>{{ l.t.s("nav.shares") }}</h1>
+<a class="button primary" href="/">{{ crate::icons::icon("plus")|safe }}{{ l.t.s("nav.upload") }}</a>
+</div>
+<div class="toolbar">
+<nav class="tabs">
+<a href="/shares"{% if !trash %} aria-current="page"{% endif %}>{{ crate::icons::icon("list")|safe }}{{ l.t.s("list.active") }}</a>
+<a href="/shares?tab=trash"{% if trash %} aria-current="page"{% endif %}>{{ crate::icons::icon("trash")|safe }}{{ l.t.s("list.trash") }}</a>
+</nav>
+<div class="filter" role="search">
+<span class="search">{{ crate::icons::icon("search")|safe }}<input type="search" id="search" placeholder="{{ l.t.s("list.search") }}" aria-label="{{ l.t.s("list.search") }}"></span>
+<span class="dates">{{ crate::icons::icon("calendar")|safe }}<input type="date" id="from" aria-label="{{ l.t.s("list.created") }} {{ l.t.s("list.from") }}" title="{{ l.t.s("list.from") }}"><span>–</span><input type="date" id="to" aria-label="{{ l.t.s("list.created") }} {{ l.t.s("list.to") }}" title="{{ l.t.s("list.to") }}"></span>
+</div>
+</div>
+{% if let Some(e) = error %}<p class="error" role="alert">{{ e }}</p>{% endif %}
+{% if rows.is_empty() %}
+<div class="empty">
+<div class="empty-icon">{% if trash %}{{ crate::icons::icon("trash")|safe }}{% else %}{{ crate::icons::icon("inbox")|safe }}{% endif %}</div>
+<p>{% if trash %}{{ l.t.s("list.trash_empty") }}{% else %}{{ l.t.s("list.empty") }}{% endif %}</p>
+{% if !trash %}<a class="button primary" href="/">{{ crate::icons::icon("upload")|safe }}{{ l.t.s("nav.upload") }}</a>{% endif %}
+</div>
+{% else %}
+<ul class="shares">
+{% for r in rows %}
+<li class="share" data-created="{{ r.created.0 }}">
+<span class="share-icon vis-{{ r.vis }}" title="{{ r.visibility }}">{{ crate::icons::visibility(r.vis)|safe }}</span>
+<div class="share-main">
+{% if trash %}<span class="path">/{{ r.path }}/</span>{% else %}<a class="path" href="{{ r.url }}" target="_blank" rel="noopener">/{{ r.path }}/</a>{% endif %}
+<span class="meta">
+<span>{{ r.visibility }}</span>
+<span>{{ crate::icons::icon("file")|safe }}{{ r.entry }}</span>
+<span class="badge">{{ r.kind }}</span>
+<span>{{ crate::icons::icon("drive")|safe }}{{ r.size }}</span>
+<span title="{{ l.t.s("list.created") }}">{{ crate::icons::icon("calendar")|safe }}<time datetime="{{ r.created.0 }}">{{ r.created.1 }}</time></span>
+{% if !trash %}<span>{{ crate::icons::icon("clock")|safe }}{% if let Some(e) = r.expires %}{{ l.t.s("list.expires") }} <time datetime="{{ e.0 }}">{{ e.1 }}</time>{% else %}{{ l.t.s("expiry.never") }}{% endif %}</span>{% endif %}
+{% if trash %}{% if r.purging %}<span class="badge warn">{{ l.t.s("list.deleting") }}</span>{% else %}<span class="badge">{{ crate::icons::icon("clock")|safe }}{{ l.t.s("list.days_left").replace("{}", r.days_left.to_string().as_str()) }}</span>{% endif %}{% endif %}
+</span>
+</div>
+<div class="actions">
+{% if trash %}
+{% if !r.purging %}
+<form method="post" action="/shares/{{ r.id }}/restore" class="inline">
+{% if r.ask_path %}<input name="path" required placeholder="{{ l.t.s("restore.new_path") }}" aria-label="{{ l.t.s("restore.new_path") }}" value="{{ r.path }}">{% endif %}
+<button type="submit" class="secondary">{{ crate::icons::icon("restore")|safe }}{{ l.t.s("action.restore") }}</button>
+</form>
+<form method="post" action="/shares/{{ r.id }}/purge" class="inline" data-confirm="{{ l.t.s("confirm.purge") }}"><button type="submit" class="danger">{{ crate::icons::icon("trash")|safe }}{{ l.t.s("action.purge") }}</button></form>
+{% endif %}
+{% else %}
+<input type="hidden" id="url-{{ r.id }}" value="{{ r.url }}">
+<button type="button" class="secondary" data-copy="url-{{ r.id }}">{{ crate::icons::icon("copy")|safe }}<span class="label">{{ l.t.s("action.copy") }}</span></button>
+<a class="button secondary icon-only" href="/shares/{{ r.id }}/edit" title="{{ l.t.s("action.edit") }}" aria-label="{{ l.t.s("action.edit") }}">{{ crate::icons::icon("pencil")|safe }}</a>
+<form method="post" action="/shares/{{ r.id }}/delete" class="inline"><button type="submit" class="danger icon-only" title="{{ l.t.s("action.delete") }}" aria-label="{{ l.t.s("action.delete") }}">{{ crate::icons::icon("trash")|safe }}</button></form>
+{% endif %}
+</div>
+</li>
+{% endfor %}
+</ul>
+<p id="no-match" class="empty" hidden>{{ l.t.s("list.no_match") }}</p>
+{% endif %}
+{% endblock %}

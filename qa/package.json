@@ -1,0 +1,11 @@
+{
+  "name": "dropgo-qa",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "qa": "node qa.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1"
+  }
+}

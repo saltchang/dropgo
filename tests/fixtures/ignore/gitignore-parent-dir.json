@@ -1,0 +1,2 @@
+{"files": {".gitignore": "out/\n", "out/.gitignore": "!keep.md\n", "out/keep.md": "x", "index.md": "x"},
+ "kept": ["index.md"]}

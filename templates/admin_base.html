@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="{{ l.t.locale }}" data-theme="{{ l.theme }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>{% block title %}{% endblock %} · dropgo</title>
+<link rel="stylesheet" href="/_dropgo/assets/dropgo.css">
+<script defer src="/_dropgo/assets/admin.js"></script>
+</head>
+<body class="admin">
+<header class="topbar">
+<a class="brand" href="/"><span class="logo">{{ crate::icons::icon("download")|safe }}</span>dropgo</a>
+<nav class="nav">
+<a href="/"{% if l.nav == "upload" %} aria-current="page"{% endif %}>{{ crate::icons::icon("upload")|safe }}<span>{{ l.t.s("nav.upload") }}</span></a>
+<a href="/shares"{% if l.nav == "shares" %} aria-current="page"{% endif %}>{{ crate::icons::icon("list")|safe }}<span>{{ l.t.s("nav.shares") }}</span></a>
+</nav>
+<div class="prefs">
+<form method="post" action="/prefs"><input type="hidden" name="back" value="{{ l.back }}"><input type="hidden" name="theme" value="{{ l.other_theme() }}">
+{% if l.theme == "dark" %}<button type="submit" class="icon-button" title="{{ l.t.s("theme.to_light") }}" aria-label="{{ l.t.s("theme.to_light") }}">{{ crate::icons::icon("sun")|safe }}</button>
+{% else %}<button type="submit" class="icon-button" title="{{ l.t.s("theme.to_dark") }}" aria-label="{{ l.t.s("theme.to_dark") }}">{{ crate::icons::icon("moon")|safe }}</button>{% endif %}
+</form>
+<form method="post" action="/prefs"><input type="hidden" name="back" value="{{ l.back }}"><input type="hidden" name="locale" value="{{ l.other_locale() }}"><button type="submit" class="ghost" lang="{{ l.other_locale() }}">{{ crate::icons::icon("languages")|safe }}{{ l.t.s("nav.other_locale") }}</button></form>
+</div>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

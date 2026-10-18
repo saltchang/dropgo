@@ -1,0 +1,46 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ l.t.s("action.edit") }}{% endblock %}
+{% block content %}
+<div class="page-head">
+<a class="back" href="/shares">{{ crate::icons::icon("arrow-left")|safe }}{{ l.t.s("nav.shares") }}</a>
+<h1>{{ l.t.s("edit.title") }}</h1>
+</div>
+<form method="post" action="/shares/{{ share.id }}/edit" class="card stack" data-expiry>
+<label>{{ l.t.s("form.path") }}
+{# one-time-code: Chromium never takes such a field for the username of the new-password form, so Brave offers no email alias here. #}
+<input name="path" value="{{ path }}" required autocomplete="one-time-code" spellcheck="false">
+</label>
+<div class="grid-2">
+<label>{{ l.t.s("form.visibility") }}
+<select name="visibility">
+<option value="owner"{% if visibility == "owner" %} selected{% endif %}>{{ l.t.s("visibility.owner") }}</option>
+<option value="public"{% if visibility != "owner" %} selected{% endif %}>{{ l.t.s("visibility.public") }}</option>
+</select>
+</label>
+<div class="field" data-disable-if="visibility=owner">
+<label for="password">{{ l.t.s("form.password") }}</label>
+<span class="secret"><input type="password" name="password" id="password" autocomplete="new-password" placeholder="{% if share.password_hash.is_some() %}{{ l.t.s("form.password_keep") }}{% else %}{{ l.t.s("form.password_hint") }}{% endif %}"><button type="button" class="icon-button reveal" data-reveal="password" aria-pressed="false" title="{{ l.t.s("form.show_password") }}" aria-label="{{ l.t.s("form.show_password") }}">{{ crate::icons::icon("eye")|safe }}{{ crate::icons::icon("eye-off")|safe }}</button></span>
+{% if share.password_hash.is_some() %}<label class="check"><input type="checkbox" name="clear_password" value="1"> {{ l.t.s("form.password_clear") }}</label>{% endif %}
+</div>
+</div>
+<div class="field">
+<label for="expires-local">{{ l.t.s("form.expiry") }}</label>
+<div class="expiry">
+<input type="datetime-local" id="expires-local" data-local-for="expires_at"{% if let Some(e) = expires %} data-initial="{{ e.0 }}"{% endif %}>
+<div class="chips">
+<button type="button" class="chip" data-days="1">{{ l.t.s("expiry.1d") }}</button>
+<button type="button" class="chip" data-days="7">{{ l.t.s("expiry.7d") }}</button>
+<button type="button" class="chip" data-days="30">{{ l.t.s("expiry.30d") }}</button>
+<button type="button" class="chip" data-days="0">{{ l.t.s("expiry.never") }}</button>
+</div>
+</div>
+<p class="hint">{{ l.t.s("form.expiry_hint") }}</p>
+</div>
+<input type="hidden" name="expires_at" value="keep">
+{% if let Some(e) = error %}<p class="error" role="alert">{{ e }}</p>{% endif %}
+<div class="row">
+<button type="submit" class="primary">{{ crate::icons::icon("check")|safe }}{{ l.t.s("action.save") }}</button>
+<a class="button secondary" href="/shares">{{ l.t.s("action.cancel") }}</a>
+</div>
+</form>
+{% endblock %}

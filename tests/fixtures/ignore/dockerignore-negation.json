@@ -1,0 +1,2 @@
+{"files": {".dockerignore": "# comment\ndrafts\n!drafts/keep.md\n", "drafts/a.md": "x", "drafts/keep.md": "x", "index.md": "x"},
+ "kept": ["drafts/keep.md", "index.md"]}

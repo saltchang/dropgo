@@ -1,0 +1,2 @@
+{"files": {".gitignore": "build/\n*.tmp\n!keep.tmp\n", "build/out.html": "x", "src/build/x.md": "x", "a.tmp": "x", "keep.tmp": "x", "index.html": "x"},
+ "kept": ["index.html", "keep.tmp"]}
