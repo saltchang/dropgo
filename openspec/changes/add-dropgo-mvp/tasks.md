@@ -12,7 +12,7 @@
 - [x] 2.4 sqlx migration for `users`, `identities` (unique `(issuer, subject)`) and `shares` (partial unique index on active paths), and call the session store's own migrate
 - [x] 2.5 object_store setup from a URL (`s3://`, `file://`, `memory://`)
 - [x] 2.6 Test harness: testcontainers Postgres plus the in-memory store, and one smoke test
-- [x] 2.7 Dockerfile (musl, distroless) and GitHub Actions that run tests and push a multi-arch image to ghcr on tags
+- [x] 2.7 Dockerfile (musl, distroless) and GitHub Actions that run tests and push a version-tagged amd64 image to ghcr on tags
 
 ## 3. Owner auth
 

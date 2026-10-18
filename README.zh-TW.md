@@ -31,7 +31,7 @@
          POSTGRES_PASSWORD: change-me
        volumes: [db:/var/lib/postgresql/data]
      dropgo:
-       image: ghcr.io/saltchang/dropgo:latest
+       image: ghcr.io/saltchang/dropgo:0.1.0
        depends_on: [db]
        ports: ["8080:8080"]
        volumes: [files:/data]

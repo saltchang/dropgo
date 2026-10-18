@@ -212,7 +212,7 @@ erDiagram
 
 ## Migration Plan
 
-No migration is needed because this is the first release. CI builds a multi-arch image to `ghcr.io/saltchang/dropgo` on each tag. Rollback means deploying the previous tag. Migrations only add things until 1.0.
+No migration is needed because this is the first release. CI builds an amd64 image to `ghcr.io/saltchang/dropgo` on each `v` tag, tagged with the version only (no `latest`), and creates the GitHub release. Rollback means deploying the previous tag. Migrations only add things until 1.0.
 
 ## Open Questions
 
