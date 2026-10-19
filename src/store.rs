@@ -47,19 +47,19 @@ pub async fn delete_prefix(store: &Store, prefix: &Path) -> object_store::Result
     Ok(())
 }
 
-/// Relative paths of the original files of one upload, sorted.
+/// Relative paths and sizes of the original files of one upload, sorted.
 pub async fn list_files(
     store: &Store,
     share_id: uuid::Uuid,
     upload_id: uuid::Uuid,
-) -> object_store::Result<Vec<String>> {
+) -> object_store::Result<Vec<(String, u64)>> {
     let base = format!("shares/{share_id}/{upload_id}/files/");
-    let mut out: Vec<String> = store
+    let mut out: Vec<(String, u64)> = store
         .list(Some(&Path::from(base.as_str())))
         // Keys are percent-encoded, so `100%.png` lists as `100%25.png`.
         .map_ok(|m| {
             let rel = m.location.as_ref().strip_prefix(&base).unwrap_or_default();
-            percent_encoding::percent_decode_str(rel).decode_utf8_lossy().into_owned()
+            (percent_encoding::percent_decode_str(rel).decode_utf8_lossy().into_owned(), m.size)
         })
         .try_collect()
         .await?;

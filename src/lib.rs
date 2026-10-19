@@ -1,6 +1,8 @@
 pub mod admin;
+pub mod api;
 pub mod auth;
 pub mod claim;
+pub mod cli;
 pub mod config;
 pub mod i18n;
 pub mod icons;
@@ -11,6 +13,7 @@ pub mod render;
 pub mod share;
 pub mod store;
 pub mod token;
+pub mod tokens;
 pub mod upload;
 
 use std::collections::HashMap;
@@ -162,7 +165,7 @@ pub async fn rerender(st: &AppState) -> anyhow::Result<()> {
         sqlx::query_as("SELECT id, upload_id FROM shares WHERE state <> 'purging'").fetch_all(&st.db).await?;
     let mut pages = 0;
     for (id, upload) in shares {
-        for rel in store::list_files(&st.store, id, upload).await? {
+        for (rel, _) in store::list_files(&st.store, id, upload).await? {
             if !rel.ends_with(".md") {
                 continue;
             }

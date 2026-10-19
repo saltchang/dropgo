@@ -57,7 +57,7 @@ Both hosts need HTTPS. The session cookies use the `__Host-` prefix, which brows
 
 ## Configuration
 
-Every option is an env var, and also a flag (`dropgo --help`).
+Every option is an env var, and also a flag after `serve` or `rerender` (`dropgo serve --help`). Flags before the subcommand, such as `dropgo --database-url X rerender`, no longer parse.
 
 | Env var | Default | What it does |
 |---|---|---|
@@ -79,6 +79,26 @@ Every option is an env var, and also a flag (`dropgo --help`).
 For S3, set the usual `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, and `AWS_ENDPOINT` for R2, MinIO and the like.
 
 `/_dropgo/healthz` answers 200 on any host, for probes.
+
+## Use from a coding agent
+
+The `dropgo` binary is also a client. It uploads, lists, edits, trashes, restores and reads shares through the `/api/v1` JSON API, prints JSON, and exits with a code that says what went wrong. `skills/dropgo/SKILL.md` teaches a coding agent how to use it.
+
+1. Sign in to the admin site, open **Tokens**, and create a token.
+2. Paste this prompt into your coding agent (Claude Code, Codex, opencode, Copilot or another):
+
+   ```text
+   Install the dropgo CLI and its agent skill for me.
+   1. Download dropgo-linux-amd64 and SKILL.md from the latest release of https://github.com/saltchang/dropgo/releases.
+   2. Install the binary on my PATH as `dropgo` and make it executable. On macOS or Linux on another CPU, run `cargo install --git https://github.com/saltchang/dropgo --tag <that release tag>` instead.
+   3. Install SKILL.md as a skill named `dropgo` where you load user-level skills. If you have no skill support, append it to your global instructions file.
+   4. Run `dropgo --version` and show me the output.
+   5. Ask me to run `dropgo auth login` in my own terminal. Do not ask me for the token in this chat.
+   ```
+
+3. Run `dropgo auth login` when the agent asks. It asks for the admin URL and the token, then saves both to `~/.config/dropgo/config.toml` with mode 0600. `DROPGO_URL` and `DROPGO_TOKEN` override the file.
+
+Tokens expire after 7, 30, 90 or 365 days. Revoke one on the tokens page.
 
 ## Deployment notes
 

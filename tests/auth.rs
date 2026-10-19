@@ -135,13 +135,14 @@ async fn allowed_user_lands_on_first_page() {
     assert_ne!(login.done.cookie(login.cookie_name), login.start.cookie(login.cookie_name));
     let page = app.get(&format!("{ADMIN}/"), &[("cookie", &admin_cookie(&login.session()))]).await;
     assert_eq!(page.status, 200);
-    let counts: (i64, i64, String) = sqlx::query_as(
-        "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM identities), (SELECT locale FROM users)",
+    let counts: (i64, i64, String, Option<String>) = sqlx::query_as(
+        "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM identities), (SELECT locale FROM users), \
+         (SELECT owner_claim FROM users)",
     )
     .fetch_one(&app.st.db)
     .await
     .unwrap();
-    assert_eq!(counts, (1, 1, "zh-TW".into()), "locale from Accept-Language");
+    assert_eq!(counts, (1, 1, "zh-TW".into(), Some("alice".into())), "locale from Accept-Language, claim stored");
 }
 
 #[tokio::test]

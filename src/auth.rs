@@ -225,6 +225,8 @@ async fn finish_login(
 
     let locale = i18n::negotiate(headers.get(header::ACCEPT_LANGUAGE).and_then(|v| v.to_str().ok()));
     let user_id = find_or_create_user(&st.db, &issuer, &subject, locale).await?;
+    // API requests check this against the allowlist, since they have no session.
+    sqlx::query("UPDATE users SET owner_claim = $2 WHERE id = $1").bind(user_id).bind(&claim).execute(&st.db).await?;
 
     let until = OffsetDateTime::now_utc() + Duration::hours(SESSION_HOURS);
     session.cycle_id().await?;

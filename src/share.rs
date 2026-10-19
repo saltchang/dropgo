@@ -29,7 +29,7 @@ use crate::{
 };
 
 pub const THEME_COOKIE: &str = "__Host-dropgo-theme";
-const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
+pub(crate) const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
 const MAX_WRONG_PER_MINUTE: usize = 5;
 
 #[derive(sqlx::FromRow, Clone, Debug)]
@@ -395,7 +395,7 @@ fn moved(to: String) -> Response {
     (StatusCode::MOVED_PERMANENTLY, [(header::LOCATION, to)]).into_response()
 }
 
-fn content_type(name: &str) -> String {
+pub(crate) fn content_type(name: &str) -> String {
     let m = mime_guess::from_path(name).first_or_octet_stream();
     if m.type_() == mime_guess::mime::TEXT || m.subtype() == mime_guess::mime::JAVASCRIPT {
         format!("{m}; charset=utf-8")
@@ -656,7 +656,7 @@ async fn zip_share(st: &AppState, share: &ShareRow) -> anyhow::Result<Vec<u8>> {
     static ZIPS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(2);
     let _permit = ZIPS.acquire().await?;
     let mut files = Vec::new();
-    for rel in store::list_files(&st.store, share.id, share.upload_id).await? {
+    for (rel, _) in store::list_files(&st.store, share.id, share.upload_id).await? {
         let bytes = store::get_bytes(&st.store, &store::file_key(share.id, share.upload_id, &rel)).await?;
         files.push((rel, bytes));
     }

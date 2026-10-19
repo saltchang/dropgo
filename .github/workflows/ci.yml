@@ -60,6 +60,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+      # The release binary is the one in the image, so both are the same build.
+      - run: |
+          id=$(docker create "ghcr.io/saltchang/dropgo:${GITHUB_REF_NAME#v}")
+          docker cp "$id:/dropgo" dropgo-linux-amd64
+          docker rm "$id"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes dropgo-linux-amd64 skills/dropgo/SKILL.md
         env:
           GH_TOKEN: ${{ github.token }}

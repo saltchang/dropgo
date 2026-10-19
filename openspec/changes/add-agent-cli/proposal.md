@@ -40,7 +40,7 @@ The Web UI routes keep their behavior. The new tokens page is part of `api-token
 ## Impact
 
 - New migration: an `api_tokens` table and a `users.owner_claim` column.
-- `src/main.rs` and `src/config.rs` change so that client subcommands start without the database or store settings.
+- `src/main.rs` and `src/config.rs` change so that client subcommands start without the database or store settings. **Breaking:** server flags must follow `serve` or `rerender`; `dropgo --database-url X rerender` no longer parses. Env vars and a bare `dropgo` are unchanged.
 - Bearer requests skip the `Origin` check, which only guards cookie sessions.
 - New dependencies for the client: `reqwest` with multipart, which `openidconnect` already pulls in, and `rpassword` for reading the token without echo.
 - CI builds and attaches the release binary.

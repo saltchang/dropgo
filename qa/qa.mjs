@@ -215,6 +215,23 @@ await m.screenshot({ path: `${dir}shots/13-mobile-done.png`, fullPage: true });
 await m.goto(A + '/shares');
 await m.screenshot({ path: `${dir}shots/14-mobile-list.png`, fullPage: true });
 
+// 8. API tokens: shown once and works as a bearer token. shots/token.txt keeps it for CLI checks.
+await p.goto(A + '/tokens');
+await p.fill('input[name=name]', `qa-${R}`);
+await p.click('form[action="/tokens"] button[type=submit]');
+const token = await p.inputValue('#new-token');
+check('new token shown once', token.startsWith('dgo_'));
+await shot(p, '15-token-created');
+writeFileSync(`${dir}shots/token.txt`, token);
+const me = await ctx.request.get(A + '/api/v1/me', { headers: { authorization: `Bearer ${token}` } });
+check('token works on /api/v1/me', me.status() === 200 && (await me.json()).name === `qa-${R}`);
+await p.goto(A + '/tokens');
+check('token hidden after reload', !(await p.content()).includes(token));
+await shot(p, '16-tokens-list');
+const noCookie = await br.newContext({ ignoreHTTPSErrors: true });
+const anonMe = await noCookie.request.get(A + '/api/v1/me');
+check('API without a token is a JSON 401', anonMe.status() === 401 && (await anonMe.json()).error.code === 'auth.missing_token');
+
 // The path check answers 409 while the overwrite prompt is shown.
 const unexpected = errors.filter((e) => !e.includes('status of 409'));
 check('no unexpected console errors', unexpected.length === 0, unexpected.join(' | '));
