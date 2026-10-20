@@ -27,7 +27,7 @@ use crate::{
 };
 
 /// A user-facing failure: HTTP status, catalog key, and details for the overwrite prompt.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Fail {
     pub status: StatusCode,
     pub key: &'static str,
@@ -57,7 +57,7 @@ pub fn internal(e: impl std::fmt::Display) -> Fail {
 }
 
 /// The owner's share at a path, so the form can offer to overwrite it with its settings filled in.
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct Existing {
     pub id: Uuid,
     pub visibility: String,
@@ -129,7 +129,16 @@ pub async fn owner_t(st: &AppState, owner: Uuid) -> T<'_> {
 
 #[derive(Deserialize)]
 pub struct CheckQuery {
-    path: String,
+    pub path: String,
+}
+
+/// The normalized path when it is free, `None` for an empty path, which gets a random one.
+pub async fn check(st: &AppState, owner: Uuid, raw: &str) -> Result<Option<String>, Fail> {
+    let Some(path) = paths::parse_share_path(raw).map_err(path_fail)? else { return Ok(None) };
+    match claim::precheck(&st.db, owner, &path, None).await.map_err(internal)? {
+        Ok(_) => Ok(Some(path)),
+        Err(e) => Err(claim_fail(&st.db, e).await),
+    }
 }
 
 /// Lets the upload form show conflicts and the overwrite prompt while the owner types.
@@ -138,16 +147,10 @@ pub async fn check_path(
     Extension(OwnerId(owner)): Extension<OwnerId>,
     Query(q): Query<CheckQuery>,
 ) -> Response {
-    let t = owner_t(&st, owner).await;
-    let path = match paths::parse_share_path(&q.path) {
-        Ok(Some(p)) => p,
-        Ok(None) => return Json(json!({ "ok": true })).into_response(),
-        Err(e) => return path_fail(e).into_response(t),
-    };
-    match claim::precheck(&st.db, owner, &path, None).await {
-        Ok(Ok(_)) => Json(json!({ "ok": true, "path": path })).into_response(),
-        Ok(Err(e)) => claim_fail(&st.db, e).await.into_response(t),
-        Err(e) => internal(e).into_response(t),
+    match check(&st, owner, &q.path).await {
+        Ok(None) => Json(json!({ "ok": true })).into_response(),
+        Ok(Some(path)) => Json(json!({ "ok": true, "path": path })).into_response(),
+        Err(f) => f.into_response(owner_t(&st, owner).await),
     }
 }
 
@@ -184,19 +187,21 @@ pub async fn upload(
     Extension(OwnerId(owner)): Extension<OwnerId>,
     multipart: Multipart,
 ) -> Response {
-    let t = owner_t(&st, owner).await;
-    let job = match receive(&st, owner, multipart).await {
-        Ok(j) => j,
-        Err(f) => return f.into_response(t),
-    };
-    // A spawned task keeps going if the client disconnects now, and shutdown waits for it.
-    match st.tracker.spawn(run(st.clone(), job)).await {
-        Ok(Ok(path)) => {
+    match receive_and_store(&st, owner, multipart).await {
+        Ok((_, path)) => {
             Json(json!({ "url": format!("{}/{path}/", st.cfg.share_origin), "path": path })).into_response()
         }
-        Ok(Err(f)) => f.into_response(t),
-        Err(e) => internal(e).into_response(t),
+        Err(f) => f.into_response(owner_t(&st, owner).await),
     }
+}
+
+/// The whole upload, for the Web UI and the API. Returns the share id and its path.
+pub async fn receive_and_store(st: &AppState, owner: Uuid, multipart: Multipart) -> Result<(Uuid, String), Fail> {
+    let job = receive(st, owner, multipart).await?;
+    let id = job.share_id;
+    // A spawned task keeps going if the client disconnects now, and shutdown waits for it.
+    let path = st.tracker.spawn(run(st.clone(), job)).await.map_err(internal)??;
+    Ok((id, path))
 }
 
 async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, Fail> {
@@ -217,6 +222,10 @@ async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, F
         let name = field.name().unwrap_or_default().to_string();
         let is_file = name.starts_with("f:") || name == "zip";
         if !is_file {
+            // The precheck ran on the first file, so a later setting would be silently ignored.
+            if checked.is_some() {
+                return Err(Fail::new(StatusCode::BAD_REQUEST, "upload.field_order"));
+            }
             let v = field.text().await.map_err(|_| Fail::new(StatusCode::BAD_REQUEST, "upload.interrupted"))?;
             match name.as_str() {
                 "path" => s.path = v,

@@ -1,0 +1,57 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ l.t.s("nav.tokens") }}{% endblock %}
+{% block content %}
+<div class="page-head">
+<h1>{{ l.t.s("tokens.heading") }}</h1>
+<p class="lead">{{ l.t.s("tokens.lead") }}</p>
+</div>
+{% if needs_sign_in %}
+<div class="notice" role="alert">{{ crate::icons::icon("alert")|safe }}<div><p>{{ l.t.s("tokens.sign_in_again") }}</p>
+<form method="post" action="/tokens/sign-in"><button type="submit" class="secondary">{{ l.t.s("tokens.sign_in") }}</button></form></div></div>
+{% endif %}
+{% if let Some(token) = new_token %}
+<div class="card stack" role="status">
+<p>{{ crate::icons::icon("check-circle")|safe }} {{ l.t.s("tokens.created") }}</p>
+<div class="row"><input id="new-token" value="{{ token }}" readonly spellcheck="false" aria-label="{{ l.t.s("tokens.created") }}">
+<button type="button" class="primary" data-copy="new-token">{{ crate::icons::icon("copy")|safe }}<span class="label">{{ l.t.s("tokens.copy") }}</span></button></div>
+</div>
+{% endif %}
+<form method="post" action="/tokens" class="card stack">
+<div class="grid-2">
+<label>{{ l.t.s("tokens.name") }}
+<input name="name" required maxlength="100" autocomplete="off" placeholder="{{ l.t.s("tokens.name_placeholder") }}">
+</label>
+<label>{{ l.t.s("form.expiry") }}
+<select name="days">
+{% for d in crate::tokens::EXPIRY_DAYS %}<option value="{{ d }}"{% if d == 90 %} selected{% endif %}>{{ l.t.s("tokens.days").replace("{}", d.to_string().as_str()) }}</option>{% endfor %}
+</select>
+</label>
+</div>
+{% if let Some(e) = error %}<p class="error" role="alert">{{ e }}</p>{% endif %}
+<div class="row"><button type="submit" class="primary">{{ crate::icons::icon("plus")|safe }}{{ l.t.s("tokens.create") }}</button></div>
+</form>
+{% if rows.is_empty() %}
+<div class="empty"><div class="empty-icon">{{ crate::icons::icon("key")|safe }}</div><p>{{ l.t.s("tokens.empty") }}</p></div>
+{% else %}
+<ul class="shares">
+{% for r in rows %}
+<li class="share">
+<span class="share-icon">{{ crate::icons::icon("key")|safe }}</span>
+<div class="share-main">
+<span class="path">{{ r.name }}</span>
+<span class="meta">
+<span><code>dgo_{{ r.prefix }}…</code></span>
+<span title="{{ l.t.s("list.created") }}">{{ crate::icons::icon("calendar")|safe }}<time datetime="{{ r.created.0 }}">{{ r.created.1 }}</time></span>
+<span>{{ crate::icons::icon("clock")|safe }}{{ l.t.s("list.expires") }} <time datetime="{{ r.expires.0 }}">{{ r.expires.1 }}</time></span>
+<span>{{ l.t.s("tokens.last_used") }} {% if let Some(u) = r.last_used %}<time datetime="{{ u.0 }}">{{ u.1 }}</time>{% else %}{{ l.t.s("tokens.never_used") }}{% endif %}</span>
+{% if r.expired %}<span class="badge warn">{{ l.t.s("tokens.expired") }}</span>{% endif %}
+</span>
+</div>
+<div class="actions">
+<form method="post" action="/tokens/{{ r.id }}/revoke" class="inline" data-confirm="{{ l.t.s("tokens.confirm_revoke") }}"><button type="submit" class="danger">{{ crate::icons::icon("trash")|safe }}{{ l.t.s("tokens.revoke") }}</button></form>
+</div>
+</li>
+{% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

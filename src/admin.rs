@@ -21,6 +21,7 @@ use crate::{
     lifecycle::{self, RestoreError, TRASH_DAYS},
     paths,
     share::ShareRow,
+    tokens,
     upload::{self, Fail},
 };
 
@@ -38,6 +39,9 @@ pub fn router(st: AppState) -> Router {
         .route("/shares/{id}/restore", post(restore))
         .route("/shares/{id}/purge", post(purge))
         .route("/prefs", post(prefs))
+        .route("/tokens", get(tokens::page).post(tokens::create_post))
+        .route("/tokens/{id}/revoke", post(tokens::revoke))
+        .route("/tokens/sign-in", post(tokens::sign_in_again))
         .route("/api/check", get(upload::check_path))
         .route("/api/upload", post(upload::upload).layer(DefaultBodyLimit::max(body_limit)))
         .route_layer(middleware::from_fn_with_state(st.clone(), auth::require_owner));
@@ -47,7 +51,9 @@ pub fn router(st: AppState) -> Router {
         .route("/_dropgo/assets/{*path}", get(asset))
         .layer(middleware::from_fn_with_state(st.clone(), auth::check_origin))
         .layer(middleware::from_fn(headers))
-        .with_state(st)
+        .with_state(st.clone())
+        // Outside the layers above: bearer only, so no Origin check, and file responses keep their sandbox CSP.
+        .nest("/api/v1", crate::api::router(st))
 }
 
 async fn headers(req: Request, next: Next) -> Response {
@@ -61,23 +67,23 @@ async fn headers(req: Request, next: Next) -> Response {
 }
 
 /// What the base layout needs on every page.
-struct Layout<'a> {
-    t: T<'a>,
-    theme: String,
-    nav: &'static str,
-    back: String,
+pub(crate) struct Layout<'a> {
+    pub(crate) t: T<'a>,
+    pub(crate) theme: String,
+    pub(crate) nav: &'static str,
+    pub(crate) back: String,
 }
 
 impl Layout<'_> {
-    fn other_theme(&self) -> &'static str {
+    pub(crate) fn other_theme(&self) -> &'static str {
         if self.theme == "dark" { "light" } else { "dark" }
     }
-    fn other_locale(&self) -> &'static str {
+    pub(crate) fn other_locale(&self) -> &'static str {
         LOCALES.into_iter().find(|l| *l != self.t.locale).unwrap_or("en")
     }
 }
 
-async fn layout<'a>(st: &'a AppState, owner: Uuid, nav: &'static str, back: &str) -> Layout<'a> {
+pub(crate) async fn layout<'a>(st: &'a AppState, owner: Uuid, nav: &'static str, back: &str) -> Layout<'a> {
     let (locale, theme): (String, String) = sqlx::query_as("SELECT locale, theme FROM users WHERE id = $1")
         .bind(owner)
         .fetch_optional(&st.db)
@@ -88,24 +94,24 @@ async fn layout<'a>(st: &'a AppState, owner: Uuid, nav: &'static str, back: &str
     Layout { t: st.i18n.t(&locale), theme, nav, back: back.to_string() }
 }
 
-fn html(page: impl Template) -> Response {
+pub(crate) fn html(page: impl Template) -> Response {
     match page.render() {
         Ok(s) => ([(header::CONTENT_TYPE, "text/html; charset=utf-8")], s).into_response(),
         Err(e) => internal(e),
     }
 }
 
-fn internal(e: impl std::fmt::Display) -> Response {
+pub(crate) fn internal(e: impl std::fmt::Display) -> Response {
     tracing::error!("admin: {e}");
     StatusCode::INTERNAL_SERVER_ERROR.into_response()
 }
 
-fn rfc3339(t: OffsetDateTime) -> String {
+pub(crate) fn rfc3339(t: OffsetDateTime) -> String {
     t.format(&Rfc3339).unwrap_or_default()
 }
 
 /// Shown until admin.js swaps in the browser's local time.
-fn utc_text(t: OffsetDateTime) -> String {
+pub(crate) fn utc_text(t: OffsetDateTime) -> String {
     let f = format_description!("[year]-[month]-[day] [hour]:[minute] UTC");
     t.format(&f).unwrap_or_default()
 }
@@ -214,6 +220,24 @@ async fn list(
     render_list(&st, owner, q, None, None).await
 }
 
+/// The owner's active shares, or the trash, newest first. The API also filters by path.
+pub(crate) async fn list_shares(
+    st: &AppState,
+    owner: Uuid,
+    trash: bool,
+    path: Option<&str>,
+) -> sqlx::Result<Vec<ShareRow>> {
+    sqlx::query_as(
+        "SELECT * FROM shares WHERE owner_id = $1 AND ($2 AND state <> 'active' OR NOT $2 AND state = 'active') \
+         AND ($3::text IS NULL OR path = $3) ORDER BY created_at DESC",
+    )
+    .bind(owner)
+    .bind(trash)
+    .bind(path)
+    .fetch_all(&st.db)
+    .await
+}
+
 async fn render_list(
     st: &AppState,
     owner: Uuid,
@@ -224,15 +248,7 @@ async fn render_list(
     let trash = q.tab == "trash";
     let back = if trash { "/shares?tab=trash" } else { "/shares" };
     let l = layout(st, owner, "shares", back).await;
-    let rows: Vec<ShareRow> = match sqlx::query_as(
-        "SELECT * FROM shares WHERE owner_id = $1 AND ($2 AND state <> 'active' OR NOT $2 AND state = 'active') \
-         ORDER BY created_at DESC",
-    )
-    .bind(owner)
-    .bind(trash)
-    .fetch_all(&st.db)
-    .await
-    {
+    let rows = match list_shares(st, owner, trash, None).await {
         Ok(r) => r,
         Err(e) => return internal(e),
     };
@@ -325,7 +341,7 @@ struct EditPage<'a> {
     error: Option<String>,
 }
 
-async fn active_share(st: &AppState, owner: Uuid, id: Uuid) -> sqlx::Result<Option<ShareRow>> {
+pub(crate) async fn active_share(st: &AppState, owner: Uuid, id: Uuid) -> sqlx::Result<Option<ShareRow>> {
     sqlx::query_as("SELECT * FROM shares WHERE id = $1 AND owner_id = $2 AND state = 'active'")
         .bind(id)
         .bind(owner)
@@ -357,15 +373,15 @@ async fn edit_page(
 }
 
 #[derive(Deserialize)]
-struct EditForm {
-    path: String,
-    visibility: String,
+pub(crate) struct EditForm {
+    pub(crate) path: String,
+    pub(crate) visibility: String,
     #[serde(default)]
-    password: String,
-    clear_password: Option<String>,
+    pub(crate) password: String,
+    pub(crate) clear_password: Option<String>,
     /// `keep`, empty for never, or a time.
     #[serde(default)]
-    expires_at: String,
+    pub(crate) expires_at: String,
 }
 
 async fn edit(
@@ -390,7 +406,7 @@ async fn edit(
     }
 }
 
-async fn save_edit(st: &AppState, owner: Uuid, share: &ShareRow, f: &EditForm) -> Result<(), Fail> {
+pub(crate) async fn save_edit(st: &AppState, owner: Uuid, share: &ShareRow, f: &EditForm) -> Result<(), Fail> {
     let now = OffsetDateTime::now_utc();
     let path = paths::parse_share_path(&f.path)
         .map_err(upload::path_fail)?

@@ -57,7 +57,7 @@
 
 ## 設定
 
-每個選項都是環境變數，也可以用 flag（`dropgo --help`）。
+每個選項都是環境變數，也可以用 flag，寫在 `serve` 或 `rerender` 之後（`dropgo serve --help`）。flag 寫在子命令前面（例如 `dropgo --database-url X rerender`）已不再支援。
 
 | 環境變數 | 預設值 | 用途 |
 |---|---|---|
@@ -79,6 +79,26 @@
 用 S3 的話，設定常見的 `AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`、`AWS_REGION`；R2、MinIO 這類服務再加上 `AWS_ENDPOINT`。
 
 `/_dropgo/healthz` 在任何 host 都回 200，給健康檢查用。
+
+## 給 coding agent 使用
+
+`dropgo` 執行檔同時也是 client。它透過 `/api/v1` JSON API 上傳、列出、編輯、丟進垃圾桶、還原與讀取分享，輸出 JSON，並用 exit code 說明錯在哪裡。`skills/dropgo/SKILL.md` 教 coding agent 怎麼用它。
+
+1. 登入管理站，打開 **Token**，建立一組 token。
+2. 把下面的提示貼給你的 coding agent（Claude Code、Codex、opencode、Copilot 或其他）：
+
+   ```text
+   Install the dropgo CLI and its agent skill for me.
+   1. Download dropgo-linux-amd64 and SKILL.md from the latest release of https://github.com/saltchang/dropgo/releases.
+   2. Install the binary on my PATH as `dropgo` and make it executable. On macOS or Linux on another CPU, run `cargo install --git https://github.com/saltchang/dropgo --tag <that release tag>` instead.
+   3. Install SKILL.md as a skill named `dropgo` where you load user-level skills. If you have no skill support, append it to your global instructions file.
+   4. Run `dropgo --version` and show me the output.
+   5. Ask me to run `dropgo auth login` in my own terminal. Do not ask me for the token in this chat.
+   ```
+
+3. agent 請你執行時，在自己的終端機跑 `dropgo auth login`。它會詢問管理站網址和 token，然後以 0600 權限存到 `~/.config/dropgo/config.toml`。`DROPGO_URL` 與 `DROPGO_TOKEN` 會覆蓋設定檔。
+
+Token 的效期可選 7、30、90 或 365 天，可在 tokens 頁撤銷。
 
 ## 部署注意事項
 

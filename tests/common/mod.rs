@@ -112,8 +112,15 @@ impl App {
     }
 
     /// Creates a user and returns its id and a session cookie value for `__Host-dropgo-*`.
+    /// The subject doubles as the stored owner claim.
     pub async fn user(&self, subject: &str) -> (Uuid, String) {
         let id = dropgo::auth::find_or_create_user(&self.st.db, "https://idp.test", subject, "en").await.unwrap();
+        sqlx::query("UPDATE users SET owner_claim = $2 WHERE id = $1")
+            .bind(id)
+            .bind(subject)
+            .execute(&self.st.db)
+            .await
+            .unwrap();
         let until = OffsetDateTime::now_utc() + Duration::hours(12);
         let mut rec = Record {
             id: Id::default(),
@@ -125,6 +132,40 @@ impl App {
         };
         self.st.sessions.create(&mut rec).await.unwrap();
         (id, rec.id.to_string())
+    }
+
+    /// A user with a session and an API token.
+    pub async fn token(&self, subject: &str) -> (Uuid, String, String) {
+        let (id, session) = self.user(subject).await;
+        let token = dropgo::tokens::create(&self.st.db, id, "test", 90).await.unwrap();
+        (id, session, token)
+    }
+
+    /// An `/api/v1` request with a bearer token and an optional JSON body, without an Origin header.
+    pub async fn api(&self, method: &str, path: &str, token: &str, json: Option<serde_json::Value>) -> Res {
+        let auth = format!("Bearer {token}");
+        let mut h = vec![("authorization", auth.as_str())];
+        let body = match json {
+            Some(v) => {
+                h.push(("content-type", "application/json"));
+                Body::from(v.to_string())
+            }
+            None => Body::empty(),
+        };
+        self.send(req(method, &format!("{ADMIN}/api/v1{path}"), &h, body)).await
+    }
+
+    /// Uploads through the API with settings first, as the CLI sends them.
+    pub async fn api_upload(&self, token: &str, settings: &[(&str, &str)], files: &[(&str, &[u8])]) -> Res {
+        let (ct, body) = multipart(settings, files);
+        let auth = format!("Bearer {token}");
+        self.send(req(
+            "POST",
+            &format!("{ADMIN}/api/v1/shares"),
+            &[("authorization", &auth), ("content-type", &ct)],
+            Body::from(body),
+        ))
+        .await
     }
 
     pub async fn send(&self, req: Request<Body>) -> Res {

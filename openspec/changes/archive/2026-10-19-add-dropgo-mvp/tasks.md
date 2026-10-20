@@ -69,4 +69,4 @@
 - [x] 9.1 README.md in English: what it is, quick start with docker compose (Postgres, a local store and any OIDC provider), the env var table, and deployment notes: the reverse proxy body size limit, a writable temp dir with room for concurrent uploads (an emptyDir on Kubernetes), and a termination grace period long enough to finish uploads
 - [x] 9.2 README.zh-TW.md with the same content in Traditional Chinese (Taiwan usage)
 - [x] 9.3 Edit both READMEs with the humanizer skill, the i-have-adhd writing rules and the ponytail rules
-- [ ] 9.4 MIT LICENSE, then tag v0.1.0
+- [x] 9.4 MIT LICENSE, then tag v0.1.0

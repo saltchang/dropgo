@@ -7,17 +7,31 @@ use clap::{Args, Parser, Subcommand};
 #[command(version, about = "Drop a file or folder, get a share link")]
 pub struct Cli {
     #[command(subcommand)]
-    pub command: Option<Command>,
-    #[command(flatten)]
-    pub config: Config,
+    pub command: Command,
 }
 
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Serve the admin and share hosts (the default).
-    Serve,
+    Serve(Config),
     /// Rebuild the rendered pages of every share that has not been purged.
-    Rerender,
+    Rerender(Config),
+    #[command(flatten)]
+    Client(crate::cli::Client),
+}
+
+impl Cli {
+    /// Parses the arguments. A bare `dropgo`, or one with only server flags, still serves.
+    pub fn parse_args(mut args: Vec<std::ffi::OsString>) -> Cli {
+        let serve = args
+            .get(1)
+            .and_then(|a| a.to_str())
+            .is_none_or(|a| a.starts_with('-') && !matches!(a, "-h" | "--help" | "-V" | "--version"));
+        if serve {
+            args.insert(1, "serve".into());
+        }
+        Cli::parse_from(args)
+    }
 }
 
 #[derive(Args, Debug, Clone)]
@@ -140,6 +154,27 @@ mod tests {
         let c = parse_cidr("fd00::/12").unwrap();
         assert!(c.contains("fd0a::1".parse().unwrap()));
         assert!(parse_cidr("10.0.0.0/33").is_err());
+    }
+
+    #[test]
+    fn bare_binary_serves() {
+        let parse = |args: &[&str]| Cli::parse_args(args.iter().map(Into::into).collect()).command;
+        // Required server settings come from flags here, as they would from env in the image.
+        let flags = [
+            "--admin-origin=https://a.test",
+            "--share-origin=https://s.test",
+            "--oidc-issuer=x",
+            "--oidc-client-id=x",
+            "--oidc-client-secret=x",
+            "--owners=a",
+            "--secret=0123456789abcdef0123456789abcdef",
+            "--database-url=x",
+            "--store-url=memory://",
+        ];
+        let mut args = vec!["dropgo"];
+        args.extend(flags);
+        assert!(matches!(parse(&args), Command::Serve(_)));
+        assert!(matches!(parse(&["dropgo", "list"]), Command::Client(crate::cli::Client::List { trash: false })));
     }
 
     #[test]
