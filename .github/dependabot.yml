@@ -1,0 +1,15 @@
+# Security updates for every ecosystem are on in the repo settings. Version
+# updates only for the few pins that drift: Cargo and npm would flood main.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly

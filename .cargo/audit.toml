@@ -1,0 +1,11 @@
+# Known advisories with no fix to take. Anything new fails the weekly audit.
+[advisories]
+ignore = [
+    # rsa Marvin attack, no fixed release; via openidconnect, which only verifies IdP signatures.
+    "RUSTSEC-2023-0071",
+    # Unmaintained, pulled in by askama_derive (basic-toml) and syntect (bincode, yaml-rust).
+    "RUSTSEC-2026-0374",
+    "RUSTSEC-2025-0141",
+    "RUSTSEC-2024-0320",
+]
+informational_warnings = ["unmaintained", "unsound"]
