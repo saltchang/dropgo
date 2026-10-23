@@ -11,7 +11,7 @@ jobs:
   cargo-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: cargo install cargo-audit --locked
       # Fails on any advisory, unmaintained or unsound crate not ignored in .cargo/audit.toml.
       - run: cargo audit --deny warnings
