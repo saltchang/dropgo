@@ -1,5 +1,5 @@
 # Static musl build; the vendored web assets in static/ are embedded at compile time.
-FROM rust:1.95-alpine AS build
+FROM rust:1.98-alpine AS build
 RUN apk add --no-cache build-base cmake perl
 WORKDIR /src
 COPY . .
