@@ -50,7 +50,7 @@ pub fn config() -> Config {
         oidc_issuer: "http://127.0.0.1:1/default".into(),
         oidc_client_id: "dropgo".into(),
         oidc_client_secret: "secret".into(),
-        owners: vec!["alice".into()],
+        owners: vec!["alice".into(), "bob".into()],
         owner_claim: "preferred_username".into(),
         secret: "test-secret-test-secret-test-secret".into(),
         database_url: String::new(),
@@ -121,7 +121,7 @@ impl App {
             .execute(&self.st.db)
             .await
             .unwrap();
-        let until = OffsetDateTime::now_utc() + Duration::hours(12);
+        let until = OffsetDateTime::now_utc() + Duration::days(30);
         let mut rec = Record {
             id: Id::default(),
             data: HashMap::from([(

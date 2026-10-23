@@ -94,8 +94,6 @@
 "tokens.name_required" = "Enter a name for the token."
 "tokens.never_used" = "never"
 "tokens.revoke" = "Revoke"
-"tokens.sign_in" = "Sign in again"
-"tokens.sign_in_again" = "Sign in again before you create a token, so dropgo can check your account on every API request."
 "upload.another" = "Upload another"
 "upload.bad_file_path" = "Unsafe file path: {}"
 "upload.bad_zip" = "The zip file could not be read."

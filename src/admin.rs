@@ -41,7 +41,6 @@ pub fn router(st: AppState) -> Router {
         .route("/prefs", post(prefs))
         .route("/tokens", get(tokens::page).post(tokens::create_post))
         .route("/tokens/{id}/revoke", post(tokens::revoke))
-        .route("/tokens/sign-in", post(tokens::sign_in_again))
         .route("/api/check", get(upload::check_path))
         .route("/api/upload", post(upload::upload).layer(DefaultBodyLimit::max(body_limit)))
         .route_layer(middleware::from_fn_with_state(st.clone(), auth::require_owner));

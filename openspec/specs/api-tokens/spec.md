@@ -17,7 +17,7 @@ A signed-in owner SHALL be able to create an API token on the admin host's token
 
 #### Scenario: Owner without a stored claim
 - **WHEN** the owner has not signed in since the server started storing the owner claim
-- **THEN** creating a token is refused and the page asks the owner to sign in again
+- **THEN** their session no longer counts as signed in, and the tokens page starts sign-in
 
 ### Requirement: List and revoke tokens
 The tokens page SHALL list the owner's tokens with name, the first 8 characters after `dgo_`, created time, expiry, last used time and whether the token has expired. An owner SHALL see and revoke only their own tokens. Revoking a token SHALL take effect on the next API request that uses it.

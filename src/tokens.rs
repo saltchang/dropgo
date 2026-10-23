@@ -12,7 +12,6 @@ use rand::RngExt;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use time::{Duration, OffsetDateTime};
-use tower_sessions::Session;
 use uuid::Uuid;
 
 use crate::{
@@ -97,28 +96,22 @@ struct TokensPage<'a> {
     /// The token just created, shown this once.
     new_token: Option<String>,
     error: Option<String>,
-    /// The owner signed in before the server stored owner claims.
-    needs_sign_in: bool,
 }
 
 async fn render(st: &AppState, owner: Uuid, new_token: Option<String>, error: Option<&str>) -> Response {
     let l = layout(st, owner, "tokens", "/tokens").await;
-    let data = async {
-        let rows: Vec<(Uuid, String, String, OffsetDateTime, OffsetDateTime, Option<OffsetDateTime>)> = sqlx::query_as(
+    let rows: Vec<(Uuid, String, String, OffsetDateTime, OffsetDateTime, Option<OffsetDateTime>)> =
+        match sqlx::query_as(
             "SELECT id, name, prefix, created_at, expires_at, last_used_at FROM api_tokens \
-                 WHERE user_id = $1 ORDER BY created_at DESC",
+             WHERE user_id = $1 ORDER BY created_at DESC",
         )
         .bind(owner)
         .fetch_all(&st.db)
-        .await?;
-        let claim: Option<String> =
-            sqlx::query_scalar("SELECT owner_claim FROM users WHERE id = $1").bind(owner).fetch_one(&st.db).await?;
-        Ok::<_, sqlx::Error>((rows, claim.is_none()))
-    };
-    let (rows, needs_sign_in) = match data.await {
-        Ok(d) => d,
-        Err(e) => return internal(e),
-    };
+        .await
+        {
+            Ok(r) => r,
+            Err(e) => return internal(e),
+        };
     let now = OffsetDateTime::now_utc();
     let time = |t| (rfc3339(t), utc_text(t));
     let rows = rows
@@ -134,7 +127,7 @@ async fn render(st: &AppState, owner: Uuid, new_token: Option<String>, error: Op
         })
         .collect();
     let error = error.map(|k| l.t.s(k).to_string());
-    let mut res = html(TokensPage { l, rows, new_token, error, needs_sign_in });
+    let mut res = html(TokensPage { l, rows, new_token, error });
     // The page can hold a new token.
     res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     res
@@ -163,15 +156,6 @@ pub async fn create_post(
         return render(&st, owner, None, Some("tokens.name_required")).await;
     }
     let days = if EXPIRY_DAYS.contains(&f.days) { f.days } else { 90 };
-    let has_claim: Option<String> =
-        match sqlx::query_scalar("SELECT owner_claim FROM users WHERE id = $1").bind(owner).fetch_one(&st.db).await {
-            Ok(c) => c,
-            Err(e) => return internal(e),
-        };
-    // The page already shows the sign-in-again notice.
-    if has_claim.is_none() {
-        return render(&st, owner, None, None).await;
-    }
     match create(&st.db, owner, name, days).await {
         Ok(token) => render(&st, owner, Some(token), None).await,
         Err(e) => internal(e),
@@ -192,12 +176,4 @@ pub async fn revoke(
         Ok(_) => Redirect::to("/tokens").into_response(),
         Err(e) => internal(e),
     }
-}
-
-/// Drops the session, so the next visit to the tokens page signs in again and stores the owner claim.
-pub async fn sign_in_again(session: Session) -> Response {
-    if let Err(e) = session.flush().await {
-        return internal(e);
-    }
-    Redirect::to("/tokens").into_response()
 }

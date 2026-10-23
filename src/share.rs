@@ -92,7 +92,7 @@ struct Ctx<'a> {
 
 impl<'a> Ctx<'a> {
     async fn new(st: &'a AppState, session: Session, headers: HeaderMap) -> Ctx<'a> {
-        let owner = auth::current_owner(&session).await;
+        let owner = auth::current_owner(st, &session).await;
         Ctx { st, session, headers, owner }
     }
 

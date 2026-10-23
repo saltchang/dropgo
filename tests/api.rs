@@ -10,12 +10,6 @@ fn code(res: &Res) -> String {
     res.json()["error"]["code"].as_str().unwrap_or_default().to_string()
 }
 
-async fn two_owners() -> App {
-    let mut cfg = config();
-    cfg.owners.push("bob".into());
-    App::with(cfg, dropgo::store::from_url("memory://").unwrap()).await
-}
-
 async fn up(app: &App, token: &str, path: &str, visibility: &str) -> serde_json::Value {
     let mut s = vec![("path", path), ("visibility", visibility), ("expiry", "never")];
     if visibility == "password" {
@@ -172,7 +166,7 @@ async fn large_upload() {
 
 #[tokio::test]
 async fn check_list_get() {
-    let app = two_owners().await;
+    let app = App::new().await;
     let (_, _, t) = app.token("alice").await;
     let (_, _, bob) = app.token("bob").await;
     let mine = up(&app, &t, "notes/2026", "public").await["id"].as_str().unwrap().to_string();
@@ -352,18 +346,18 @@ async fn name_required_and_claim_required() {
     let c = admin_cookie(&s);
     let res = app.post_form(&format!("{ADMIN}/tokens"), &c, &[("name", " "), ("days", "90")]).await;
     assert!(res.text().contains("Enter a name for the token."));
+    // A session from before owner claims were stored signs in again (the provider is down in tests, so 502).
     sqlx::query("UPDATE users SET owner_claim = NULL WHERE id = $1").bind(id).execute(&app.st.db).await.unwrap();
-    let page = app.get(&format!("{ADMIN}/tokens"), &[("cookie", &c)]).await.text();
-    assert!(page.contains("/tokens/sign-in"));
+    assert_eq!(app.get(&format!("{ADMIN}/tokens"), &[("cookie", &c)]).await.status, 502);
     let res = app.post_form(&format!("{ADMIN}/tokens"), &c, &[("name", "laptop"), ("days", "90")]).await;
-    assert!(res.text().contains("Sign in again"));
+    assert_eq!(res.status, 401);
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM api_tokens").fetch_one(&app.st.db).await.unwrap();
     assert_eq!(n, 0);
 }
 
 #[tokio::test]
 async fn revoke_last_used_and_scoping() {
-    let app = two_owners().await;
+    let app = App::new().await;
     let (_, s, t) = app.token("alice").await;
     let (_, bob_s, bob_t) = app.token("bob").await;
     let db = app.st.db.clone();
@@ -407,11 +401,13 @@ async fn expired_token_and_allowlist() {
     assert_eq!((res.status, code(&res)), (401, "auth.token_expired".into()));
 
     // Same database, restarted with alice off the allowlist.
-    let (_, _, t2) = app.token("alice2").await;
+    let (_, s2, t2) = app.token("alice2").await;
     let mut cfg = config();
     cfg.owners = vec!["alice".into()];
     let st = dropgo::Inner::new(cfg, app.st.db.clone(), app.st.store.clone()).await.unwrap();
     let restarted = App { router: dropgo::router(st.clone()), st };
     let res = restarted.api("GET", "/me", &t2, None).await;
     assert_eq!((res.status, code(&res)), (401, "auth.invalid_token".into()));
+    // The 30-day session stops working at once too.
+    assert_eq!(restarted.get(&format!("{ADMIN}/"), &[("cookie", &admin_cookie(&s2))]).await.status, 502);
 }

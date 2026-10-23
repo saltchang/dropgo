@@ -94,8 +94,6 @@
 "tokens.name_required" = "請輸入 token 名稱。"
 "tokens.never_used" = "從未"
 "tokens.revoke" = "撤銷"
-"tokens.sign_in" = "重新登入"
-"tokens.sign_in_again" = "建立 token 前請重新登入，dropgo 才能在每次 API 請求時檢查你的帳號。"
 "upload.another" = "再上傳一個"
 "upload.bad_file_path" = "不安全的檔案路徑：{}"
 "upload.bad_zip" = "無法讀取這個 zip 檔。"

@@ -135,6 +135,9 @@ async fn allowed_user_lands_on_first_page() {
     assert_ne!(login.done.cookie(login.cookie_name), login.start.cookie(login.cookie_name));
     let page = app.get(&format!("{ADMIN}/"), &[("cookie", &admin_cookie(&login.session()))]).await;
     assert_eq!(page.status, 200);
+    let expiry: time::OffsetDateTime =
+        sqlx::query_scalar("SELECT expiry_date FROM tower_sessions.session").fetch_one(&app.st.db).await.unwrap();
+    assert!(expiry > time::OffsetDateTime::now_utc() + time::Duration::days(29), "sessions last 30 days");
     let counts: (i64, i64, String, Option<String>) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM users), (SELECT count(*) FROM identities), (SELECT locale FROM users), \
          (SELECT owner_claim FROM users)",

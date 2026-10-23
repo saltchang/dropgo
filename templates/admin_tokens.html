@@ -5,10 +5,6 @@
 <h1>{{ l.t.s("tokens.heading") }}</h1>
 <p class="lead">{{ l.t.s("tokens.lead") }}</p>
 </div>
-{% if needs_sign_in %}
-<div class="notice" role="alert">{{ crate::icons::icon("alert")|safe }}<div><p>{{ l.t.s("tokens.sign_in_again") }}</p>
-<form method="post" action="/tokens/sign-in"><button type="submit" class="secondary">{{ l.t.s("tokens.sign_in") }}</button></form></div></div>
-{% endif %}
 {% if let Some(token) = new_token %}
 <div class="card stack" role="status">
 <p>{{ crate::icons::icon("check-circle")|safe }} {{ l.t.s("tokens.created") }}</p>

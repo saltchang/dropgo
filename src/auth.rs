@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use crate::{AppState, i18n};
 
-pub const SESSION_HOURS: i64 = 12;
+pub const SESSION_DAYS: i64 = 30;
 const OWNER_KEY: &str = "owner";
 const PENDING_KEY: &str = "oidc";
 
@@ -60,10 +60,21 @@ struct Pending {
     return_to: String,
 }
 
-/// The signed-in owner of this session, if the session is younger than 12 hours.
-pub async fn current_owner(session: &Session) -> Option<Uuid> {
+/// The signed-in owner of this session, if it is younger than 30 days and the owner is still on the allowlist.
+pub async fn current_owner(st: &AppState, session: &Session) -> Option<Uuid> {
     let owner: Owner = session.get(OWNER_KEY).await.ok().flatten()?;
-    (owner.until > OffsetDateTime::now_utc().unix_timestamp()).then_some(owner.user_id)
+    if owner.until <= OffsetDateTime::now_utc().unix_timestamp() {
+        return None;
+    }
+    // Checked on every request, so a removal from the allowlist ends long sessions at once.
+    let claim: Option<String> = sqlx::query_scalar("SELECT owner_claim FROM users WHERE id = $1")
+        .bind(owner.user_id)
+        .fetch_optional(&st.db)
+        .await
+        .ok()
+        .flatten()
+        .flatten();
+    claim.is_some_and(|c| st.cfg.owners.contains(&c)).then_some(owner.user_id)
 }
 
 /// Only a same-host path that starts with a single `/` is accepted; anything else becomes `/`.
@@ -228,7 +239,7 @@ async fn finish_login(
     // API requests check this against the allowlist, since they have no session.
     sqlx::query("UPDATE users SET owner_claim = $2 WHERE id = $1").bind(user_id).bind(&claim).execute(&st.db).await?;
 
-    let until = OffsetDateTime::now_utc() + Duration::hours(SESSION_HOURS);
+    let until = OffsetDateTime::now_utc() + Duration::days(SESSION_DAYS);
     session.cycle_id().await?;
     session.insert(OWNER_KEY, Owner { user_id, until: until.unix_timestamp() }).await?;
     session.set_expiry(Some(Expiry::AtDateTime(until)));
@@ -274,16 +285,7 @@ pub async fn find_or_create_user(db: &sqlx::PgPool, issuer: &str, subject: &str,
 
 /// Admin routes need a signed-in owner. GETs start sign-in, anything else gets 401.
 pub async fn require_owner(State(st): State<AppState>, session: Session, mut req: Request, next: Next) -> Response {
-    let exists = match current_owner(&session).await {
-        Some(id) => sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM users WHERE id = $1)")
-            .bind(id)
-            .fetch_one(&st.db)
-            .await
-            .unwrap_or(false)
-            .then_some(id),
-        None => None,
-    };
-    match exists {
+    match current_owner(&st, &session).await {
         Some(id) => {
             req.extensions_mut().insert(OwnerId(id));
             next.run(req).await
