@@ -153,6 +153,7 @@ function showOverwrite() {
   $('path-msg').textContent = '';
   $('overwrite-msg').textContent = S['upload.js.overwrite'];
   $('visibility').value = ex.visibility === 'owner' ? 'owner' : 'public';
+  $('no-sandbox').checked = ex.sandbox === false;
   setExpiry(ex.expires_at);
   form.dispatchEvent(new Event('change', { bubbles: true }));
 }
@@ -173,6 +174,7 @@ form.addEventListener('submit', (e) => {
   const local = $('expires-local').value;
   fd.append('expiry', local ? 'custom' : 'never');
   fd.append('expires_at', local ? new Date(local).toISOString() : '');
+  fd.append('sandbox', String(!$('no-sandbox').checked));
   if (pathState.existing && $('overwrite-ok').checked) fd.append('overwrite', pathState.existing.id);
   if (pick.zip) fd.append('zip', pick.zip, pick.zip.name);
   else for (const f of pick.files) fd.append(`f:${f.path}`, f.file, f.file.name);

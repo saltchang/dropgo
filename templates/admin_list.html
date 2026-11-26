@@ -33,6 +33,7 @@
 <span>{{ r.visibility }}</span>
 <span>{{ crate::icons::icon("file")|safe }}{{ r.entry }}</span>
 <span class="badge">{{ r.kind }}</span>
+{% if !r.sandbox %}<span class="badge warn">{{ crate::icons::icon("alert")|safe }}{{ l.t.s("list.no_sandbox") }}</span>{% endif %}
 <span>{{ crate::icons::icon("drive")|safe }}{{ r.size }}</span>
 <span title="{{ l.t.s("list.created") }}">{{ crate::icons::icon("calendar")|safe }}<time datetime="{{ r.created.0 }}">{{ r.created.1 }}</time></span>
 {% if !trash %}<span>{{ crate::icons::icon("clock")|safe }}{% if let Some(e) = r.expires %}{{ l.t.s("list.expires") }} <time datetime="{{ e.0 }}">{{ e.1 }}</time>{% else %}{{ l.t.s("expiry.never") }}{% endif %}</span>{% endif %}

@@ -8,6 +8,7 @@
 - 分享端（`s.example.com`）：每個分享放在你指定的路徑下，例如 `/notes/2026/q3/`。
 - 每個分享可以公開、設密碼，或只有你自己看得到。
 - Markdown 會轉成網頁，支援程式碼上色、Mermaid 和 KaTeX。訪客可以下載原始檔、zip 或轉好的 HTML。
+- 上傳的頁面在沙箱裡執行，沒有自己的 origin。你可以針對單一分享取消這層隔離，讓自己寫的頁面能使用相機和麥克風。取消後，頁面的腳本以分享端的 origin 執行，能以瀏覽者的身分讀取你的其他分享，並對同一網站底下的其他服務送出請求。
 - 分享可以設到期時間。過期和刪除的分享會在垃圾桶留 30 天。
 - 上傳時會略過 `.gitignore`、`.dockerignore` 列出的檔案、dotfile 和 `node_modules`。
 - 介面有英文和正體中文，預設深色主題。
@@ -106,6 +107,7 @@ Token 的效期可選 7、30、90 或 365 天，可在 tokens 頁撤銷。
 - **暫存目錄。** 上傳的檔案會先寫進 `DROPGO_TMP_DIR`，空間要夠所有同時進行的上傳使用。在 Kubernetes 上請掛一個 `emptyDir`，因為 image 的根目錄應該維持唯讀。
 - **關機。** 收到 SIGTERM 後，dropgo 不再接新請求，但會把手上的上傳做完。termination grace period 要夠你最大的上傳跑完，例如 120 秒。
 - **只跑一個 replica。** 密碼嘗試次數記在記憶體裡。要跑多個 replica，就得接受每個 replica 各自計算。
+- **相機與麥克風。** 如果 reverse proxy 在分享端設了 `Permissions-Policy`，要對 `self` 允許 `camera` 和 `microphone`，否則未套用沙箱的分享仍無法使用它們。
 - **主題或上色規則有變動時。** Markdown 是在上傳時轉成網頁的。升級後如果頁面模板有改，執行一次 `dropgo rerender`。
 
 ## 開發

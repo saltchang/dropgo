@@ -286,3 +286,50 @@ async fn font_in_uploaded_page_is_cors_readable() {
     let css = app.get(&format!("{SHARE}/_dropgo/assets/vendor/katex/katex.min.css"), &[]).await;
     assert_eq!((css.status, css.header("access-control-allow-origin")), (200, "*"));
 }
+
+/// Uploads a share and turns its sandbox off.
+async fn unsandboxed(app: &App, s: &str, path: &str, visibility: &str, files: &[(&str, &[u8])]) -> uuid::Uuid {
+    let id = app.share(s, path, visibility, files).await;
+    sqlx::query("UPDATE shares SET sandbox = false WHERE id = $1").bind(id).execute(&app.st.db).await.unwrap();
+    id
+}
+
+#[tokio::test]
+async fn sandbox_setting() {
+    let app = App::new().await;
+    let (_, s) = app.user("alice").await;
+    app.share(&s, "on", "public", &[("f:index.html", HTML)]).await;
+    let id = unsandboxed(&app, &s, "off", "public", &[("f:index.html", HTML), ("f:notes.md", b"# N")]).await;
+
+    let csp = |r: &Res| r.header("content-security-policy").to_string();
+    assert_eq!(csp(&app.get(&format!("{SHARE}/on/"), &[]).await), SANDBOX, "unchanged by default");
+    let off = format!("{SANDBOX} allow-same-origin");
+    assert_eq!(csp(&app.get(&format!("{SHARE}/off/"), &[]).await), off, "file");
+    assert_eq!(csp(&app.get(&format!("{SHARE}/off/notes.md"), &[]).await), off, "rendered page");
+    let zip = app.get(&format!("{SHARE}/_dropgo/download/{id}?format=zip"), &[]).await;
+    assert_eq!((zip.status, csp(&zip)), (200, SANDBOX.to_string()), "downloads keep the full sandbox");
+
+    // Turned back on: the next response is sandboxed again.
+    sqlx::query("UPDATE shares SET sandbox = true WHERE id = $1").bind(id).execute(&app.st.db).await.unwrap();
+    assert_eq!(csp(&app.get(&format!("{SHARE}/off/"), &[]).await), SANDBOX);
+}
+
+#[tokio::test]
+async fn password_form_of_unsandboxed_share_runs_no_scripts() {
+    let app = App::new().await;
+    let (_, s) = app.user("alice").await;
+    unsandboxed(&app, &s, "locked", "password", &[("f:index.html", HTML)]).await;
+    let form = app.nav(&format!("{SHARE}/locked/"), "").await;
+    assert_eq!(form.status, 401);
+    assert!(form.header("content-security-policy").starts_with("default-src 'none'"));
+}
+
+#[tokio::test]
+async fn service_workers_are_refused() {
+    let app = App::new().await;
+    let (_, s) = app.user("alice").await;
+    app.share(&s, "sw", "public", &[("f:index.html", HTML), ("f:sw.js", b"//"), ("f:app.js", b"//")]).await;
+    let worker = app.get(&format!("{SHARE}/sw/sw.js"), &[("service-worker", "script")]).await;
+    assert_eq!(worker.status, 403);
+    assert_eq!(app.get(&format!("{SHARE}/sw/app.js"), &[("sec-fetch-dest", "script")]).await.status, 200);
+}

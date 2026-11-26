@@ -22,6 +22,8 @@ use uuid::Uuid;
 
 pub const ADMIN: &str = "https://drop.test";
 pub const SHARE: &str = "https://s.test";
+/// The sandbox every share response carries unless its owner turned it off.
+pub const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
 
 /// shortcut: statics never drop, so each test binary leaves its container running. Clean up with
 /// `docker rm -f $(docker ps -q --filter label=org.testcontainers.managed-by=testcontainers)`.

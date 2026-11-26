@@ -144,3 +144,60 @@ async fn signed_out_admin_needs_sign_in() {
     assert_eq!(res.status, 401);
     assert_eq!(app.get(&format!("{ADMIN}/_dropgo/assets/dropgo.css"), &[]).await.status, 200);
 }
+
+#[tokio::test]
+async fn sandbox_setting() {
+    let app = App::new().await;
+    let (_, s) = app.user("alice").await;
+    let c = admin_cookie(&s);
+    let page = app.get(&format!("{ADMIN}/"), &[("cookie", &c)]).await.text();
+    assert!(
+        page.contains(r#"<input type="checkbox" name="no_sandbox" id="no-sandbox" autocomplete="off">"#),
+        "unchecked"
+    );
+    assert!(page.contains("Turn off the sandbox") && page.contains("read your other shares"));
+
+    app.share(&s, "on", "public", &[("f:index.html", HTML)]).await;
+    let res = app
+        .upload(
+            &s,
+            &[("path", "off"), ("visibility", "password"), ("password", "pw"), ("sandbox", "false")],
+            &[("f:index.html", HTML)],
+        )
+        .await;
+    assert_eq!(res.status, 200, "{}", res.text());
+    let id = app.share_id("off").await;
+
+    // The overwrite prompt gets the setting it would replace.
+    let check = app.get(&format!("{ADMIN}/api/check?path=off"), &[("cookie", &c)]).await;
+    assert_eq!((check.status, check.json()["existing"]["sandbox"].as_bool()), (409, Some(false)));
+
+    let list = app.get(&format!("{ADMIN}/shares"), &[("cookie", &c)]).await.text();
+    assert_eq!(list.matches("Sandbox off").count(), 1, "only the share with the sandbox off has the badge");
+
+    let url = format!("{ADMIN}/shares/{id}/edit");
+    let edit = app.get(&url, &[("cookie", &c)]).await.text();
+    assert!(edit.contains(r#"name="no_sandbox" id="no-sandbox" autocomplete="off" checked>"#));
+
+    // Unchecked and saved: the sandbox is back on and nothing else changed.
+    let hash: Option<String> = sqlx::query_scalar("SELECT password_hash FROM shares WHERE id = $1")
+        .bind(id)
+        .fetch_one(&app.st.db)
+        .await
+        .unwrap();
+    let f = [("path", "off"), ("visibility", "public"), ("expires_at", "keep")];
+    assert_eq!(app.post_form(&url, &c, &f).await.status, 303);
+    let after: (String, String, Option<String>, Option<time::OffsetDateTime>, bool) =
+        sqlx::query_as("SELECT path, visibility, password_hash, expires_at, sandbox FROM shares WHERE id = $1")
+            .bind(id)
+            .fetch_one(&app.st.db)
+            .await
+            .unwrap();
+    assert_eq!(after, ("off".into(), "password".into(), hash, None, true));
+
+    let f = [("path", "off"), ("visibility", "public"), ("expires_at", "keep"), ("no_sandbox", "1")];
+    assert_eq!(app.post_form(&url, &c, &f).await.status, 303);
+    let sandbox: bool =
+        sqlx::query_scalar("SELECT sandbox FROM shares WHERE id = $1").bind(id).fetch_one(&app.st.db).await.unwrap();
+    assert!(!sandbox);
+}

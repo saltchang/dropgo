@@ -20,10 +20,10 @@ description: Share files, folders or Markdown notes as links on the owner's drop
 | `dropgo auth login [--url URL]` | Save the server URL and a token. Run by the user. |
 | `dropgo auth status` | Show the server and the token name and expiry. |
 | `dropgo check PATH` | Check whether a share path is free. |
-| `dropgo upload SOURCE [--path P] [--visibility public\|password\|owner] [--password PW] [--expires never\|1d\|7d\|30d\|RFC3339] [--replace] [--name FILE]` | Upload a file, folder, `.zip`, or `-` for stdin (needs `--name`). The default visibility is `owner`. `--replace` overwrites the share at `--path` and keeps the settings you leave out. |
+| `dropgo upload SOURCE [--path P] [--visibility public\|password\|owner] [--password PW] [--expires never\|1d\|7d\|30d\|RFC3339] [--replace] [--no-sandbox] [--name FILE]` | Upload a file, folder, `.zip`, or `-` for stdin (needs `--name`). The default visibility is `owner`. `--replace` overwrites the share at `--path` and keeps the settings you leave out. |
 | `dropgo list [--trash]` | List active shares, or the trash. |
 | `dropgo get REF` | Show one share. |
-| `dropgo edit REF [--path] [--visibility] [--password] [--expires]` | Change only the given settings. |
+| `dropgo edit REF [--path] [--visibility] [--password] [--expires] [--sandbox\|--no-sandbox]` | Change only the given settings. |
 | `dropgo trash REF` | Move a share to the trash. It is deleted for good after 30 days. |
 | `dropgo restore REF [--path P]` | Restore a trashed share, at its old path or at `--path`. |
 | `dropgo cat REF [FILE] [--rendered]` | List a share's files, or print one file. `--rendered` prints a Markdown file as HTML. |
@@ -45,4 +45,5 @@ description: Share files, folders or Markdown notes as links on the owner's drop
 ## Notes
 
 - A share is public only when you pass `--visibility public`. Ask the user before you make something public.
+- `--no-sandbox` lets a page use the camera and microphone, but its scripts can then read the user's other shares and send requests to other services on the same site. Ask the user before you pass it, and pass it only for a page that loads no scripts from other sites. `--sandbox` turns the isolation back on.
 - Folder uploads skip `.git`, `node_modules` and the files that `.gitignore` or `.dockerignore` exclude.

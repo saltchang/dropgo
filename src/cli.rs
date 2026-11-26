@@ -27,7 +27,7 @@ pub enum Client {
     },
     /// Show one share. REF is a share id or path.
     Get { r#ref: String },
-    /// Change a share's path, visibility, password or expiry.
+    /// Change a share's path, visibility, password, expiry or sandbox.
     Edit(EditArgs),
     /// Move a share to the trash. It is deleted for good after 30 days.
     Trash { r#ref: String },
@@ -79,6 +79,9 @@ pub struct UploadArgs {
     /// Overwrite the share at --path, keeping the settings not given here.
     #[arg(long)]
     replace: bool,
+    /// Turn off the sandbox's origin isolation, so the page can use the camera and microphone.
+    #[arg(long)]
+    no_sandbox: bool,
 }
 
 #[derive(Args, Debug)]
@@ -93,6 +96,12 @@ pub struct EditArgs {
     /// never, 1d, 7d, 30d, or an RFC 3339 time.
     #[arg(long)]
     expires: Option<String>,
+    /// Turn the sandbox back on.
+    #[arg(long, conflicts_with = "no_sandbox")]
+    sandbox: bool,
+    /// Turn off the sandbox's origin isolation, so the page can use the camera and microphone.
+    #[arg(long)]
+    no_sandbox: bool,
 }
 
 /// A failure to print on stderr, with its exit code.
@@ -168,6 +177,9 @@ async fn dispatch(cmd: Client) -> Result<(), Failure> {
             }
             if let Some(e) = a.expires {
                 body.insert("expires_at".into(), expires_value(&e)?);
+            }
+            if a.sandbox || a.no_sandbox {
+                body.insert("sandbox".into(), a.sandbox.into());
             }
             print(&api.json(api.req(Method::PATCH, &format!("/shares/{id}")).json(&body)).await?)
         }
@@ -414,6 +426,7 @@ fn file_parts(source: &str, name: Option<&str>) -> Result<Vec<(String, String, V
 async fn upload(api: &Api, a: UploadArgs) -> Result<Value, Failure> {
     let mut visibility = a.visibility;
     let mut expires = a.expires;
+    let mut sandbox = a.no_sandbox.then_some(false);
     let mut overwrite = None;
     if a.replace {
         let path = a.path.as_deref().ok_or_else(|| bad_input("--replace needs --path."))?;
@@ -425,6 +438,7 @@ async fn upload(api: &Api, a: UploadArgs) -> Result<Value, Failure> {
                 overwrite = e["id"].as_str().map(str::to_string);
                 visibility = visibility.or_else(|| e["visibility"].as_str().map(str::to_string));
                 expires = expires.or_else(|| Some(e["expires_at"].as_str().unwrap_or("never").to_string()));
+                sandbox = sandbox.or_else(|| e["sandbox"].as_bool());
             }
             Err(f) => return Err(f),
         }
@@ -435,7 +449,8 @@ async fn upload(api: &Api, a: UploadArgs) -> Result<Value, Failure> {
     }
     let files = file_parts(&a.source, a.name.as_deref())?;
     // Settings first: the server checks them before it reads the files.
-    let mut form = multipart::Form::new().text("visibility", visibility);
+    let mut form =
+        multipart::Form::new().text("visibility", visibility).text("sandbox", sandbox.unwrap_or(true).to_string());
     if let Some(p) = a.path {
         form = form.text("path", p);
     }

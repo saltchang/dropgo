@@ -63,7 +63,7 @@ Commands that take a share SHALL accept its id or its path. An argument in UUID 
 - **THEN** that share moves to the trash
 
 ### Requirement: Upload from the CLI
-`dropgo upload` SHALL accept a file, a directory, a `.zip` file, or `-` for stdin together with `--name`. A directory SHALL be filtered with the same ignore rules as the server before it is sent. Uploading to a path that holds one of the owner's shares SHALL fail with exit 5 and code `path.exists`, unless `--replace` is given. With `--replace`, that share SHALL be overwritten and SHALL keep any visibility, password or expiry not given on the command line. A new share with no `--visibility` SHALL be `owner`. `--password` with a resulting visibility other than `password` SHALL fail with exit 6 and code `bad_input` before anything is sent. `--expires` SHALL accept `never`, `1d`, `7d`, `30d` or an RFC 3339 time.
+`dropgo upload` SHALL accept a file, a directory, a `.zip` file, or `-` for stdin together with `--name`. A directory SHALL be filtered with the same ignore rules as the server before it is sent. Uploading to a path that holds one of the owner's shares SHALL fail with exit 5 and code `path.exists`, unless `--replace` is given. With `--replace`, that share SHALL be overwritten and SHALL keep any visibility, password, expiry or sandbox setting not given on the command line. A new share with no `--visibility` SHALL be `owner`. `--no-sandbox` SHALL turn the sandbox off; a new share without it SHALL have the sandbox on. `--password` with a resulting visibility other than `password` SHALL fail with exit 6 and code `bad_input` before anything is sent. `--expires` SHALL accept `never`, `1d`, `7d`, `30d` or an RFC 3339 time.
 
 #### Scenario: Markdown from stdin
 - **WHEN** `printf '# Hi' | dropgo upload - --name hi.md --path hi` runs
@@ -79,7 +79,11 @@ Commands that take a share SHALL accept its id or its path. An argument in UUID 
 
 #### Scenario: Replace
 - **WHEN** `dropgo upload ./site --path demo --replace` runs and `demo` holds one of the owner's shares
-- **THEN** it exits 0, `demo` serves the new content, and its visibility and expiry are unchanged
+- **THEN** it exits 0, `demo` serves the new content, and its visibility, expiry and sandbox setting are unchanged
+
+#### Scenario: Upload with the sandbox off
+- **WHEN** `dropgo upload ./recorder --path recorder --no-sandbox` runs
+- **THEN** stdout holds the share object with `sandbox` `false`
 
 ### Requirement: Read files from the CLI
 `dropgo cat <ref>` SHALL print the share's file list as JSON. `dropgo cat <ref> <file>` SHALL write that file's bytes, and `--rendered` SHALL write the rendered HTML of a Markdown file.
@@ -87,4 +91,19 @@ Commands that take a share SHALL accept its id or its path. An argument in UUID 
 #### Scenario: Read an owner-only page
 - **WHEN** `dropgo cat private-notes index.md --rendered` runs for an owner-only share
 - **THEN** stdout holds the rendered HTML
+
+### Requirement: Sandbox setting from the CLI
+`dropgo edit` SHALL accept `--no-sandbox` to turn a share's sandbox off and `--sandbox` to turn it back on, and SHALL leave the setting unchanged when neither is given. Giving both SHALL exit 2.
+
+#### Scenario: Turn the sandbox back on
+- **WHEN** `dropgo edit recorder --sandbox` runs for a share with the sandbox off
+- **THEN** stdout holds the share object with `sandbox` `true`
+
+#### Scenario: Edit without the flag
+- **WHEN** `dropgo edit recorder --expires 7d` runs for a share with the sandbox off
+- **THEN** the share still has the sandbox off
+
+#### Scenario: Get shows the setting
+- **WHEN** `dropgo get recorder` runs for a share with the sandbox off
+- **THEN** stdout holds the share object with `sandbox` `false`
 

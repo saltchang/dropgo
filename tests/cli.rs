@@ -185,3 +185,42 @@ async fn trash_restore_and_ambiguous_ref() {
     let r = cli.run(&["restore", id, "--path", "notes-2"], b"", &[]).await;
     assert_eq!((r.code, r.out["path"].as_str()), (0, Some("notes-2")));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sandbox_flags() {
+    let cli = Cli::new().await;
+    cli.login().await;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("index.html"), "<p>rec").unwrap();
+    let src = dir.path().to_str().unwrap();
+    let r = cli.run(&["upload", src, "--path", "recorder", "--no-sandbox"], b"", &[]).await;
+    assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(false)), "{}", r.err);
+
+    // --replace keeps it, and so does an edit without the flag.
+    let r = cli.run(&["upload", src, "--path", "recorder", "--replace"], b"", &[]).await;
+    assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(false)), "{}", r.err);
+    let r = cli.run(&["edit", "recorder", "--expires", "7d"], b"", &[]).await;
+    assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(false)), "{}", r.err);
+    let r = cli.run(&["get", "recorder"], b"", &[]).await;
+    assert_eq!(r.out["sandbox"], false);
+    let r = cli.run(&["list"], b"", &[]).await;
+    assert_eq!(r.out[0]["sandbox"], false);
+
+    let r = cli.run(&["edit", "recorder", "--sandbox", "--no-sandbox"], b"", &[]).await;
+    assert_eq!(r.code, 2);
+    let r = cli.run(&["edit", "recorder", "--sandbox"], b"", &[]).await;
+    assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(true)), "{}", r.err);
+    let r = cli.run(&["edit", "recorder", "--no-sandbox"], b"", &[]).await;
+    assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(false)), "{}", r.err);
+
+    // A new share without the flag has the sandbox on.
+    let r = cli.run(&["upload", src, "--path", "plain"], b"", &[]).await;
+    assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(true)), "{}", r.err);
+}
+
+#[test]
+fn skill_says_to_ask_before_no_sandbox() {
+    let skill = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/skills/dropgo/SKILL.md")).unwrap();
+    let rule = skill.lines().find(|l| l.starts_with("- `--no-sandbox`")).expect("a note on --no-sandbox");
+    assert!(rule.contains("Ask the user before you pass it"), "{rule}");
+}

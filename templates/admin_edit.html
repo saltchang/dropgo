@@ -37,6 +37,11 @@
 <p class="hint">{{ l.t.s("form.expiry_hint") }}</p>
 </div>
 <input type="hidden" name="expires_at" value="keep">
+<div class="field sandbox-field">
+<label class="check"><input type="checkbox" name="no_sandbox" id="no-sandbox" autocomplete="off"{% if !sandbox %} checked{% endif %}> {{ l.t.s("form.no_sandbox") }}</label>
+<p class="hint">{{ l.t.s("form.no_sandbox_hint") }}</p>
+<div class="notice">{{ crate::icons::icon("alert")|safe }}<div><p>{{ l.t.s("form.no_sandbox_warn") }}</p></div></div>
+</div>
 {% if let Some(e) = error %}<p class="error" role="alert">{{ e }}</p>{% endif %}
 <div class="row">
 <button type="submit" class="primary">{{ crate::icons::icon("check")|safe }}{{ l.t.s("action.save") }}</button>

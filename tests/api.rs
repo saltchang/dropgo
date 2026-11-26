@@ -239,6 +239,76 @@ async fn edit_rules() {
     assert_eq!(res.json()["error"]["details"]["arg"], "taken");
 }
 
+#[tokio::test]
+async fn sandbox_setting() {
+    let app = App::new().await;
+    let (_, _, t) = app.token("alice").await;
+    let s = up(&app, &t, "notes", "owner").await;
+    assert_eq!(s["sandbox"], true, "on by default");
+
+    let off = [("path", "rec"), ("visibility", "password"), ("password", "pw"), ("sandbox", "false")];
+    let res = app.api_upload(&t, &off, &[("f:index.html", HTML)]).await;
+    assert_eq!((res.status, res.json()["sandbox"].as_bool()), (201, Some(false)));
+    let id = res.json()["id"].as_str().unwrap().to_string();
+
+    let bad = [("path", "x"), ("visibility", "public"), ("sandbox", "no")];
+    let res = app.api_upload(&t, &bad, &[("f:index.html", HTML)]).await;
+    assert_eq!((res.status, code(&res)), (400, "form.bad_sandbox".into()));
+
+    // `path.exists` tells the client the setting it would replace.
+    let res = app.api_upload(&t, &[("path", "rec"), ("visibility", "public")], &[("f:index.html", HTML)]).await;
+    assert_eq!((res.status, code(&res)), (409, "path.exists".into()));
+    assert_eq!(res.json()["error"]["details"]["existing"]["sandbox"], false);
+
+    // Patching other fields keeps it; patching it keeps the others.
+    let hash = || async {
+        sqlx::query_scalar::<_, Option<String>>("SELECT password_hash FROM shares WHERE path = 'rec'")
+            .fetch_one(&app.st.db)
+            .await
+            .unwrap()
+    };
+    let before = hash().await;
+    let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "expires_at": null }))).await;
+    assert_eq!((res.status, res.json()["sandbox"].as_bool()), (200, Some(false)));
+    assert!(before.is_some() && hash().await == before, "the password is kept");
+    let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": true }))).await;
+    assert_eq!((res.status, res.json()["sandbox"].as_bool()), (200, Some(true)));
+    assert_eq!((res.json()["path"].as_str(), res.json()["visibility"].as_str()), (Some("rec"), Some("password")));
+    assert_eq!(hash().await, before);
+    let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": false }))).await;
+    assert_eq!(res.json()["sandbox"], false);
+    let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": "false" }))).await;
+    assert_eq!((res.status, code(&res)), (400, "api.bad_request".into()));
+
+    // The API's file read keeps the full sandbox.
+    let res = app.api("GET", &format!("/shares/{id}/files/index.html"), &t, None).await;
+    assert_eq!((res.status, res.header("content-security-policy")), (200, SANDBOX));
+
+    // An overwrite without the field turns it back on.
+    let again = [("path", "rec"), ("visibility", "public"), ("overwrite", id.as_str())];
+    let res = app.api_upload(&t, &again, &[("f:index.html", HTML)]).await;
+    assert_eq!((res.status, res.json()["sandbox"].as_bool()), (201, Some(true)));
+}
+
+#[tokio::test]
+async fn share_from_before_the_setting_is_sandboxed() {
+    let app = App::new().await;
+    let (uid, _, t) = app.token("alice").await;
+    // A row written without the column, as every share was before the migration.
+    let id = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO shares (id, owner_id, path, state, visibility, upload_id, entry, file_count, size_bytes) \
+         VALUES ($1, $2, 'old', 'active', 'owner', $3, 'index.html', 1, 1)",
+    )
+    .bind(id)
+    .bind(uid)
+    .bind(uuid::Uuid::new_v4())
+    .execute(&app.st.db)
+    .await
+    .unwrap();
+    assert_eq!(app.api("GET", &format!("/shares/{id}"), &t, None).await.json()["sandbox"], true);
+}
+
 // ---------- trash and restore ----------
 
 #[tokio::test]
