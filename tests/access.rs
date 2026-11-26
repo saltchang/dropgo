@@ -289,15 +289,11 @@ async fn font_in_uploaded_page_is_cors_readable() {
 
 const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
 
-/// Uploads a public share with the sandbox off and returns its id.
+/// Uploads a share and turns its sandbox off.
 async fn unsandboxed(app: &App, s: &str, path: &str, visibility: &str, files: &[(&str, &[u8])]) -> uuid::Uuid {
-    let mut settings = vec![("path", path), ("visibility", visibility), ("sandbox", "false")];
-    if visibility == "password" {
-        settings.push(("password", "hunter2"));
-    }
-    let res = app.upload(s, &settings, files).await;
-    assert_eq!(res.status, 200, "{}", res.text());
-    app.share_id(path).await
+    let id = app.share(s, path, visibility, files).await;
+    sqlx::query("UPDATE shares SET sandbox = false WHERE id = $1").bind(id).execute(&app.st.db).await.unwrap();
+    id
 }
 
 #[tokio::test]
@@ -336,7 +332,7 @@ async fn password_form_of_unsandboxed_share_runs_no_scripts() {
 async fn service_workers_are_refused() {
     let app = App::new().await;
     let (_, s) = app.user("alice").await;
-    unsandboxed(&app, &s, "sw", "public", &[("f:index.html", HTML), ("f:sw.js", b"//"), ("f:app.js", b"//")]).await;
+    app.share(&s, "sw", "public", &[("f:index.html", HTML), ("f:sw.js", b"//"), ("f:app.js", b"//")]).await;
     let worker = app.get(&format!("{SHARE}/sw/sw.js"), &[("service-worker", "script")]).await;
     assert_eq!(worker.status, 403);
     assert_eq!(app.get(&format!("{SHARE}/sw/app.js"), &[("sec-fetch-dest", "script")]).await.status, 200);

@@ -6,6 +6,8 @@ use serde_json::json;
 const MD: &[u8] = b"# Notes\n\nHello **agent**.";
 const HTML: &[u8] = b"<p>x";
 
+const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
+
 fn code(res: &Res) -> String {
     res.json()["error"]["code"].as_str().unwrap_or_default().to_string()
 }
@@ -246,7 +248,7 @@ async fn sandbox_setting() {
     let s = up(&app, &t, "notes", "owner").await;
     assert_eq!(s["sandbox"], true, "on by default");
 
-    let off = [("path", "rec"), ("visibility", "public"), ("sandbox", "false")];
+    let off = [("path", "rec"), ("visibility", "password"), ("password", "pw"), ("sandbox", "false")];
     let res = app.api_upload(&t, &off, &[("f:index.html", HTML)]).await;
     assert_eq!((res.status, res.json()["sandbox"].as_bool()), (201, Some(false)));
     let id = res.json()["id"].as_str().unwrap().to_string();
@@ -261,15 +263,29 @@ async fn sandbox_setting() {
     assert_eq!(res.json()["error"]["details"]["existing"]["sandbox"], false);
 
     // Patching other fields keeps it; patching it keeps the others.
+    let hash = || async {
+        let h: Option<String> = sqlx::query_scalar("SELECT password_hash FROM shares WHERE path = 'rec'")
+            .fetch_one(&app.st.db)
+            .await
+            .unwrap();
+        h
+    };
+    let before = hash().await;
     let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "expires_at": null }))).await;
     assert_eq!((res.status, res.json()["sandbox"].as_bool()), (200, Some(false)));
+    assert!(before.is_some() && hash().await == before, "the password is kept");
     let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": true }))).await;
     assert_eq!((res.status, res.json()["sandbox"].as_bool()), (200, Some(true)));
-    assert_eq!((res.json()["path"].as_str(), res.json()["visibility"].as_str()), (Some("rec"), Some("public")));
+    assert_eq!((res.json()["path"].as_str(), res.json()["visibility"].as_str()), (Some("rec"), Some("password")));
+    assert_eq!(hash().await, before);
     let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": false }))).await;
     assert_eq!(res.json()["sandbox"], false);
     let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": "false" }))).await;
     assert_eq!((res.status, code(&res)), (400, "api.bad_request".into()));
+
+    // The API's file read keeps the full sandbox.
+    let res = app.api("GET", &format!("/shares/{id}/files/index.html"), &t, None).await;
+    assert_eq!((res.status, res.header("content-security-policy")), (200, SANDBOX));
 
     // An overwrite without the field turns it back on.
     let again = [("path", "rec"), ("visibility", "public"), ("overwrite", id.as_str())];
@@ -295,32 +311,6 @@ async fn share_from_before_the_setting_is_sandboxed() {
     .unwrap();
     assert_eq!(app.api("GET", &format!("/shares/{id}"), &t, None).await.json()["sandbox"], true);
 }
-
-#[tokio::test]
-async fn password_share_keeps_password_when_sandbox_changes() {
-    let app = App::new().await;
-    let (_, _, t) = app.token("alice").await;
-    let id = up(&app, &t, "doc", "password").await["id"].as_str().unwrap().to_string();
-    let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "sandbox": false }))).await;
-    assert_eq!((res.status, res.json()["visibility"].as_str()), (200, Some("password")));
-    let hash: Option<String> =
-        sqlx::query_scalar("SELECT password_hash FROM shares WHERE path = 'doc'").fetch_one(&app.st.db).await.unwrap();
-    assert!(hash.is_some());
-}
-
-#[tokio::test]
-async fn api_file_read_keeps_the_full_sandbox() {
-    let app = App::new().await;
-    let (_, _, t) = app.token("alice").await;
-    let off = [("path", "rec"), ("visibility", "owner"), ("sandbox", "false")];
-    let id = app.api_upload(&t, &off, &[("f:index.html", HTML)]).await.json()["id"].as_str().unwrap().to_string();
-    let res = app.api("GET", &format!("/shares/{id}/files/index.html"), &t, None).await;
-    assert_eq!(res.status, 200);
-    assert!(res.header("content-security-policy").starts_with("sandbox "));
-    assert!(!res.header("content-security-policy").contains("allow-same-origin"));
-}
-
-// ---------- trash and restore ----------
 
 #[tokio::test]
 async fn trash_and_restore() {

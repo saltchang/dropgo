@@ -2,16 +2,10 @@
 
 `src/share.rs` sets `Content-Security-Policy: sandbox ...` on every response that serves uploaded or rendered content, through `content()` and the `SANDBOX` constant. The API's file read in `src/api.rs` uses the same constant. dropgo's own pages on the share host (password form, error pages) get their own policy from `own_page()`, `default-src 'none'`, which already blocks scripts. Share settings live in the `shares` table and flow through three writers: the upload task (`upload::store_and_claim`), the Web UI edit (`admin::save_edit`) and the API edit, which builds an `admin::EditForm` and calls `save_edit`.
 
-## Goals / Non-Goals
-
-**Goals:**
+## Goals
 
 - One boolean per share that decides whether its files and rendered pages get `allow-same-origin`.
 - Every writer sets it, every reader shows it, and nothing else about the sandbox changes.
-
-**Non-Goals:**
-
-- The items listed under Non-goals in the proposal.
 
 ## Decisions
 
@@ -21,7 +15,7 @@ Migration `0003_share_sandbox.sql` adds `sandbox boolean NOT NULL DEFAULT true` 
 
 ### Headers
 
-`content()` takes the share's setting. A second constant, `SANDBOX_SAME_ORIGIN`, holds the same directive with `allow-same-origin` added, and a unit test checks that it equals `SANDBOX` plus that token, so the two cannot drift apart. `serve_file` passes `share.sandbox`; `download` and the API file read always use `SANDBOX`. `own_page()` does not change.
+`content()` takes the share's setting. A second constant, `SANDBOX_SAME_ORIGIN`, holds the same directive with `allow-same-origin` added, and the share-access tests compare both against the served headers. `serve_file` passes `share.sandbox`; `download` and the API file read always use `SANDBOX`. `own_page()` does not change.
 
 ### Service Workers
 
@@ -47,9 +41,7 @@ The multipart field `sandbox` is read with the other settings. Empty or `true` m
 
 ## Risks / Trade-offs
 
-- [A share with the sandbox off can read the owner's other shares and send same-site requests] → Accepted by the requester. The setting is off by default, the Web UI warns while it is checked, the list marks such shares, and the agent skill asks before turning it off.
 - [Such a page can store data in the share host's `localStorage` or IndexedDB, which every share with the sandbox off can read] → Part of the same accepted risk; shares with the sandbox on still get an opaque origin and cannot reach it.
-- [A worker registered before this change] → None can exist: until now every share response has carried the sandbox without `allow-same-origin`, so no page could register one.
 
 ## Migration Plan
 

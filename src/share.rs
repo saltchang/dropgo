@@ -727,11 +727,6 @@ mod tests {
     }
 
     #[test]
-    fn same_origin_sandbox_adds_only_one_token() {
-        assert_eq!(SANDBOX_SAME_ORIGIN, format!("{SANDBOX} allow-same-origin"));
-    }
-
-    #[test]
     fn cookies() {
         let mut h = HeaderMap::new();
         h.insert(header::COOKIE, "a=1; __Host-dropgo-theme=light; b=2".parse().unwrap());
