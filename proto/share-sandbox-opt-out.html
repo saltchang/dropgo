@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-TW" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototype: sandbox opt-out · dropgo</title>
+<link rel="stylesheet" href="../static/dropgo.css">
+<style>
+  /* Prototype only: section labels between the three mock screens. */
+  .proto-label { font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; opacity: .6; margin: 1rem 0 -.75rem; }
+  .sandbox-warn[hidden] { display: none; }
+</style>
+</head>
+<body class="admin">
+<main>
+
+<p class="proto-label">1. 上傳頁：設定表單（到期欄位下方新增一欄）</p>
+<form class="card stack" onsubmit="return false">
+<div class="field">
+<label for="expires-local">到期</label>
+<input type="datetime-local" id="expires-local">
+<p class="hint">留空就永不過期。</p>
+</div>
+<div class="field">
+<label class="check"><input type="checkbox" id="no-sandbox-upload" data-toggle="warn-upload"> 不套用沙箱（讓頁面能使用相機和麥克風）</label>
+<p class="hint">只用在你自己撰寫、不載入外部腳本的頁面。</p>
+<div id="warn-upload" class="notice sandbox-warn" hidden>
+<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+<div><p>這個頁面的腳本將能以瀏覽者的身分讀取你的其他分享，並對同一網站底下的其他服務送出請求。</p></div>
+</div>
+</div>
+<button type="submit" class="primary">上傳</button>
+</form>
+
+<p class="proto-label">2. 編輯頁：同一欄，帶入目前設定（此例為已取消隔離）</p>
+<form class="card stack" onsubmit="return false">
+<div class="field">
+<label class="check"><input type="checkbox" id="no-sandbox-edit" data-toggle="warn-edit" checked> 不套用沙箱（讓頁面能使用相機和麥克風）</label>
+<p class="hint">只用在你自己撰寫、不載入外部腳本的頁面。</p>
+<div id="warn-edit" class="notice sandbox-warn">
+<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+<div><p>這個頁面的腳本將能以瀏覽者的身分讀取你的其他分享，並對同一網站底下的其他服務送出請求。</p></div>
+</div>
+</div>
+<div class="row"><button type="submit" class="primary">儲存</button></div>
+</form>
+
+<p class="proto-label">3. 分享清單：已取消隔離的分享多一個警示標籤</p>
+<ul class="shares">
+<li class="share">
+<span class="share-icon vis-public"></span>
+<div class="share-main">
+<a class="path" href="#">/recorder/</a>
+<span class="meta">
+<span>任何人</span>
+<span>index.html</span>
+<span class="badge">HTML</span>
+<span class="badge warn"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>未套用沙箱</span>
+<span>12 KB</span>
+</span>
+</div>
+</li>
+<li class="share">
+<span class="share-icon vis-owner"></span>
+<div class="share-main">
+<a class="path" href="#">/notes/</a>
+<span class="meta">
+<span>只有我</span>
+<span>index.md</span>
+<span class="badge">Markdown</span>
+<span>3 KB</span>
+</span>
+</div>
+</li>
+</ul>
+
+</main>
+<script>
+  // Prototype only: the warning shows while the checkbox is checked.
+  for (const box of document.querySelectorAll('[data-toggle]')) {
+    box.addEventListener('change', () => { document.getElementById(box.dataset.toggle).hidden = !box.checked; });
+  }
+</script>
+</body>
+</html>
