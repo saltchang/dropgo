@@ -27,7 +27,7 @@
 
 ## 5. Skill, docs and browser checks
 
-- [ ] 5.1 `skills/dropgo/SKILL.md`: the flags and the rule to ask first, with a test for the rule
-- [ ] 5.2 README (en and zh-TW): the setting, the same-site risk and the reverse proxy's `Permissions-Policy`
-- [ ] 5.3 `qa/qa.mjs`: the warning, the badge, `getUserMedia` with a fake camera and a refused worker registration
-- [ ] 5.4 Run the full verification: `cargo fmt`, `cargo test`, `web` tests and qa
+- [x] 5.1 `skills/dropgo/SKILL.md`: the flags and the rule to ask first, with a test for the rule
+- [x] 5.2 README (en and zh-TW): the setting, the same-site risk and the reverse proxy's `Permissions-Policy`
+- [x] 5.3 `qa/qa.mjs`: the warning, the badge, `getUserMedia` with a fake camera and a refused worker registration
+- [x] 5.4 Run the full verification: `cargo fmt`, `cargo test`, `web` tests and qa

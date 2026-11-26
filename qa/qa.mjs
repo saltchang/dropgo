@@ -1,4 +1,4 @@
-// Browser QA against the stack in compose.yml: sign-in, uploads, share pages, markdown, trash and 360 px.
+// Browser QA against the stack in compose.yml: sign-in, uploads, share pages, markdown, trash, sandbox and 360 px.
 // Writes 2560x1440 screenshots to shots/ and exits 1 if a check fails. Run: npm run qa
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -39,6 +39,16 @@ for (const [rel, body] of Object.entries(site)) {
   writeFileSync(join(fx, 'mysite', rel), body);
 }
 writeFileSync(join(fx, 'notes.md'), notes);
+// A page that needs a real origin: the camera, and a Service Worker the share host must refuse.
+mkdirSync(join(fx, 'cam'));
+writeFileSync(join(fx, 'cam', 'index.html'), `<!doctype html><meta charset="utf-8"><title>Recorder</title><p id="cam">waiting</p><p id="sw">waiting</p>
+<script>
+const say = (id, t) => { document.getElementById(id).textContent = t; };
+navigator.mediaDevices.getUserMedia({ video: true }).then((s) => say('cam', 'camera ok: ' + s.getVideoTracks().length), (e) => say('cam', 'camera failed: ' + e.name));
+navigator.serviceWorker.register('sw.js').then(() => say('sw', 'worker registered'), (e) => say('sw', 'worker refused: ' + e.name));
+</script>
+`);
+writeFileSync(join(fx, 'cam', 'sw.js'), 'self.addEventListener("fetch", () => {});\n');
 const zipEntries = Object.entries(site).map(([rel, body]) => ['mysite/' + rel, body]);
 zipEntries.push(['__MACOSX/mysite/._index.html', 'm']);
 writeFileSync(join(fx, 'mysite.zip'), storedZip(zipEntries));
@@ -66,7 +76,8 @@ function storedZip(entries) {
   return Buffer.concat([...parts, cd, end]);
 }
 
-const br = await chromium.launch();
+// A fake camera that needs no prompt, for the share with the sandbox off.
+const br = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
 const ctx = await br.newContext({ ignoreHTTPSErrors: true, viewport: { width: 2560, height: 1440 }, locale: 'zh-TW' });
 const p = await ctx.newPage();
 const errors = [];
@@ -186,6 +197,34 @@ p.on('dialog', (d) => d.accept());
 await p.locator('form[action$="/delete"] button').first().click();
 await p.goto(A + '/shares?tab=trash');
 await shot(p, '11-trash');
+
+// 6b. A share with the sandbox off: the warning, the camera, no worker, and the badge.
+await p.goto(A + '/');
+check('sandbox warning hidden by default', await p.locator('.sandbox-field .notice').isHidden());
+await p.setInputFiles('#pick-folder', fx + '/cam');
+await p.fill('#path', `rec-${R}`);
+await p.selectOption('#visibility', 'public');
+await p.check('#no-sandbox');
+check('sandbox warning shows while checked', await p.locator('.sandbox-field .notice').isVisible());
+await p.waitForFunction(() => !document.getElementById('submit').disabled);
+await shot(p, '11b-upload-no-sandbox');
+await p.click('#submit');
+await p.waitForSelector('#done:not([hidden])');
+const camUrl = await p.inputValue('#share-url');
+const cam = await ctx.newPage();
+await cam.goto(camUrl);
+await cam.waitForFunction(() => !['cam', 'sw'].some((id) => document.getElementById(id).textContent === 'waiting'));
+check('getUserMedia works with the sandbox off', (await cam.textContent('#cam')) === 'camera ok: 1', await cam.textContent('#cam'));
+check('share host refuses a Service Worker', (await cam.textContent('#sw')).startsWith('worker refused'), await cam.textContent('#sw'));
+await cam.close();
+await p.goto(A + '/shares');
+// Earlier runs leave shares behind, so compare this run's two uploads.
+const badge = (path) => p.locator('li.share', { hasText: path }).locator('.badge.warn').count();
+check('list marks only the share with the sandbox off', (await badge(`rec-${R}`)) === 1 && (await badge(`site-${R}`)) === 0);
+await shot(p, '11c-list-no-sandbox');
+await p.locator('li.share', { hasText: `rec-${R}` }).locator('a[href$="/edit"]').click();
+check('edit page starts checked with the warning', await p.isChecked('#no-sandbox') && await p.locator('.sandbox-field .notice').isVisible());
+await shot(p, '11d-edit-no-sandbox');
 
 // 7. 360 px on a phone: no page scrolls sideways; zip upload works.
 const editUrl = A + await p.goto(A + '/shares').then(() => p.locator('a[href$="/edit"]').first().getAttribute('href'));

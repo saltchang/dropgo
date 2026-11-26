@@ -8,6 +8,7 @@ Drop an HTML file, a Markdown note, a folder or a zip in your browser and get a 
 - Share host (`s.example.com`): serves each share under a path you pick, such as `/notes/2026/q3/`.
 - Each share is public, behind a password, or visible only to you.
 - Markdown is rendered with code highlighting, Mermaid and KaTeX. Visitors can download the source, a zip or the rendered HTML.
+- Uploaded pages run in a sandbox with no origin of their own. You can turn that isolation off for one share, so a page you wrote can use the camera and microphone. Its scripts then run on the share host's origin: they can read your other shares as the visitor and send requests to other services under the same site.
 - Shares can expire. Expired and deleted shares go to the trash for 30 days.
 - `.gitignore`, `.dockerignore`, dotfiles and `node_modules` are skipped on upload.
 - UI in English and Traditional Chinese, dark theme by default.
@@ -106,6 +107,7 @@ Tokens expire after 7, 30, 90 or 365 days. Revoke one on the tokens page.
 - **Temp dir.** Uploads are written to `DROPGO_TMP_DIR` before they are stored. It needs room for every upload that can run at once. On Kubernetes, mount an `emptyDir` there, because the image's root filesystem should stay read-only.
 - **Shutdown.** On SIGTERM dropgo stops taking requests and finishes the uploads it already has. Give it a termination grace period long enough for your biggest upload, for example 120 seconds.
 - **One replica.** The password attempt limit lives in memory. Run more replicas only if you accept a per-replica limit.
+- **Camera and microphone.** If your reverse proxy sets `Permissions-Policy` on the share host, allow `camera` and `microphone` for `self`, or shares with the sandbox off cannot use them.
 - **Theme or highlight changes.** Markdown is rendered at upload. After an upgrade that changes the page template, run `dropgo rerender` once.
 
 ## Development

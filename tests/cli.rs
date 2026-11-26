@@ -217,3 +217,10 @@ async fn sandbox_flags() {
     let r = cli.run(&["upload", src, "--path", "plain"], b"", &[]).await;
     assert_eq!((r.code, r.out["sandbox"].as_bool()), (0, Some(true)), "{}", r.err);
 }
+
+#[test]
+fn skill_says_to_ask_before_no_sandbox() {
+    let skill = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/skills/dropgo/SKILL.md")).unwrap();
+    let rule = skill.lines().find(|l| l.starts_with("- `--no-sandbox`")).expect("a note on --no-sandbox");
+    assert!(rule.contains("Ask the user before you pass it"), "{rule}");
+}
