@@ -30,6 +30,9 @@ use crate::{
 
 pub const THEME_COOKIE: &str = "__Host-dropgo-theme";
 pub(crate) const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
+/// `SANDBOX` with `allow-same-origin`, for shares whose owner turned the isolation off.
+const SANDBOX_SAME_ORIGIN: &str =
+    "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin";
 const MAX_WRONG_PER_MINUTE: usize = 5;
 
 #[derive(sqlx::FromRow, Clone, Debug)]
@@ -47,6 +50,7 @@ pub struct ShareRow {
     pub created_at: OffsetDateTime,
     pub expires_at: Option<OffsetDateTime>,
     pub trashed_at: Option<OffsetDateTime>,
+    pub sandbox: bool,
 }
 
 impl ShareRow {
@@ -74,6 +78,10 @@ pub fn router(st: AppState) -> Router {
 }
 
 async fn base_headers(req: Request, next: Next) -> Response {
+    // A worker could keep serving a share without the sandbox after the owner turns it back on.
+    if req.headers().get("service-worker").is_some_and(|v| v == "script") {
+        return StatusCode::FORBIDDEN.into_response();
+    }
     let mut res = next.run(req).await;
     let h = res.headers_mut();
     h.insert(header::REFERRER_POLICY, HeaderValue::from_static("no-referrer"));
@@ -358,14 +366,14 @@ async fn serve_file(ctx: &Ctx<'_>, share: &ShareRow, rest: &str, current_url: &s
         let html = String::from_utf8_lossy(&stored);
         let footer = footer(ctx.t(), share, theme, current_url);
         let page = render::personalize(&html, theme, &footer).unwrap_or_else(|| html.into_owned());
-        return content(([(header::CONTENT_TYPE, "text/html; charset=utf-8")], page).into_response());
+        return content(([(header::CONTENT_TYPE, "text/html; charset=utf-8")], page).into_response(), share.sandbox);
     }
 
     let key = store::file_key(share.id, share.upload_id, &target);
     match st.store.get(&key).await {
         Ok(r) => {
             let ct = content_type(&target);
-            content(([(header::CONTENT_TYPE, ct)], Body::from_stream(r.into_stream())).into_response())
+            content(([(header::CONTENT_TYPE, ct)], Body::from_stream(r.into_stream())).into_response(), share.sandbox)
         }
         Err(object_store::Error::NotFound { .. }) => {
             // A directory without the trailing slash.
@@ -404,10 +412,11 @@ pub(crate) fn content_type(name: &str) -> String {
     }
 }
 
-/// Headers for anything that serves uploaded or rendered content.
-fn content(mut res: Response) -> Response {
+/// Headers for anything that serves uploaded or rendered content. `sandbox: false` adds `allow-same-origin`.
+fn content(mut res: Response, sandbox: bool) -> Response {
     let h = res.headers_mut();
-    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(SANDBOX));
+    let csp = if sandbox { SANDBOX } else { SANDBOX_SAME_ORIGIN };
+    h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp));
     h.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
     res
 }
@@ -644,7 +653,7 @@ async fn download(
                 name.replace(['"', '\\'], "_"),
                 percent_encoding::utf8_percent_encode(&name, percent_encoding::NON_ALPHANUMERIC)
             );
-            content(([(header::CONTENT_TYPE, ct), (header::CONTENT_DISPOSITION, disp)], body).into_response())
+            content(([(header::CONTENT_TYPE, ct), (header::CONTENT_DISPOSITION, disp)], body).into_response(), true)
         }
         Err(e) => internal(e),
     }
@@ -715,6 +724,11 @@ mod tests {
         assert_ne!(attempt_ip(ip("2001:db8:1:2::1")), attempt_ip(ip("2001:db8:1:3::1")));
         assert_eq!(attempt_ip(ip("::ffff:1.2.3.4")), ip("1.2.3.4"));
         assert_ne!(attempt_ip(ip("1.2.3.4")), attempt_ip(ip("1.2.3.5")));
+    }
+
+    #[test]
+    fn same_origin_sandbox_adds_only_one_token() {
+        assert_eq!(SANDBOX_SAME_ORIGIN, format!("{SANDBOX} allow-same-origin"));
     }
 
     #[test]

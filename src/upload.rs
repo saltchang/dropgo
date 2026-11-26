@@ -63,6 +63,7 @@ pub struct Existing {
     pub visibility: String,
     #[serde(with = "time::serde::rfc3339::option")]
     pub expires_at: Option<OffsetDateTime>,
+    pub sandbox: bool,
 }
 
 /// Turns a claim conflict into the message the owner sees.
@@ -70,7 +71,7 @@ pub async fn claim_fail(db: &sqlx::PgPool, e: ClaimError) -> Fail {
     match e {
         ClaimError::Conflict(p) => Fail::new(StatusCode::CONFLICT, "path.conflict").with_arg(p),
         ClaimError::NeedsOverwrite(id) => {
-            let existing = sqlx::query_as("SELECT id, visibility, expires_at FROM shares WHERE id = $1")
+            let existing = sqlx::query_as("SELECT id, visibility, expires_at, sandbox FROM shares WHERE id = $1")
                 .bind(id)
                 .fetch_optional(db)
                 .await
@@ -162,6 +163,7 @@ struct Settings {
     expiry: String,
     expires_at: String,
     overwrite: String,
+    sandbox: String,
 }
 
 /// Everything the upload task needs once the request body has been received.
@@ -174,6 +176,7 @@ pub struct Job {
     pub password: Option<String>,
     pub expires_at: Option<OffsetDateTime>,
     pub overwrite: Option<Uuid>,
+    pub sandbox: bool,
     /// (file on disk, relative path in the share)
     pub files: Vec<(PathBuf, String)>,
     pub entry: String,
@@ -211,7 +214,7 @@ async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, F
     let tmp = tempfile::Builder::new().prefix("dropgo-").tempdir_in(st.cfg.tmp_dir()).map_err(internal)?;
     let root = tmp.path().join("files");
     let mut s = Settings::default();
-    let mut checked: Option<(String, &'static str, Option<Uuid>)> = None;
+    let mut checked: Option<Checked> = None;
     let mut total = 0u64;
     let mut count = 0usize;
     let mut zip: Option<PathBuf> = None;
@@ -234,6 +237,7 @@ async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, F
                 "expiry" => s.expiry = v,
                 "expires_at" => s.expires_at = v,
                 "overwrite" => s.overwrite = v,
+                "sandbox" => s.sandbox = v,
                 _ => {}
             }
             continue;
@@ -275,7 +279,7 @@ async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, F
         }
         out.flush().await.map_err(internal)?;
     }
-    let Some((path, visibility, overwrite)) = checked else {
+    let Some(Checked { path, visibility, overwrite, sandbox }) = checked else {
         return Err(Fail::new(StatusCode::BAD_REQUEST, "upload.empty"));
     };
 
@@ -314,6 +318,7 @@ async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, F
         password: Some(s.password).filter(|p| !p.is_empty()),
         expires_at: parse_expiry(&s.expiry, &s.expires_at, now)?,
         overwrite,
+        sandbox,
         files,
         entry,
         size,
@@ -321,11 +326,25 @@ async fn receive(st: &AppState, owner: Uuid, mut mp: Multipart) -> Result<Job, F
     })
 }
 
+/// The settings once they pass the precheck.
+struct Checked {
+    path: String,
+    visibility: &'static str,
+    overwrite: Option<Uuid>,
+    sandbox: bool,
+}
+
 /// Validates the settings and checks the path without the lock.
-async fn precheck(st: &AppState, owner: Uuid, s: &Settings) -> Result<(String, &'static str, Option<Uuid>), Fail> {
+async fn precheck(st: &AppState, owner: Uuid, s: &Settings) -> Result<Checked, Fail> {
     let path = paths::parse_share_path(&s.path).map_err(path_fail)?.unwrap_or_else(paths::random_share_path);
     let visibility = parse_visibility(&s.visibility)?;
     parse_expiry(&s.expiry, &s.expires_at, OffsetDateTime::now_utc())?;
+    // Left out means on, also on an overwrite, so an old client never turns it off.
+    let sandbox = match s.sandbox.as_str() {
+        "" | "true" => true,
+        "false" => false,
+        _ => return Err(Fail::new(StatusCode::BAD_REQUEST, "form.bad_sandbox")),
+    };
     let overwrite = if s.overwrite.is_empty() {
         None
     } else {
@@ -335,7 +354,7 @@ async fn precheck(st: &AppState, owner: Uuid, s: &Settings) -> Result<(String, &
         return Err(Fail::new(StatusCode::BAD_REQUEST, "form.password_required"));
     }
     match claim::precheck(&st.db, owner, &path, overwrite).await.map_err(internal)? {
-        Ok(_) => Ok((path, visibility, overwrite)),
+        Ok(_) => Ok(Checked { path, visibility, overwrite, sandbox }),
         Err(e) => Err(claim_fail(&st.db, e).await),
     }
 }
@@ -446,8 +465,8 @@ async fn store_and_claim(st: &AppState, job: &Job) -> Result<String, Fail> {
         Ok(Claim::Free) if job.overwrite.is_some() => return Err(Fail::new(StatusCode::CONFLICT, "upload.changed")),
         Ok(Claim::Free) => {
             sqlx::query(
-                "INSERT INTO shares (id, owner_id, path, state, visibility, password_hash, upload_id, entry, file_count, size_bytes, expires_at) \
-                 VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10)",
+                "INSERT INTO shares (id, owner_id, path, state, visibility, password_hash, upload_id, entry, file_count, size_bytes, expires_at, sandbox) \
+                 VALUES ($1, $2, $3, 'active', $4, $5, $6, $7, $8, $9, $10, $11)",
             )
             .bind(job.share_id)
             .bind(job.owner)
@@ -459,6 +478,7 @@ async fn store_and_claim(st: &AppState, job: &Job) -> Result<String, Fail> {
             .bind(job.files.len() as i32)
             .bind(job.size as i64)
             .bind(job.expires_at)
+            .bind(job.sandbox)
             .execute(&mut *tx)
             .await
             .map_err(internal)?;
@@ -467,8 +487,8 @@ async fn store_and_claim(st: &AppState, job: &Job) -> Result<String, Fail> {
         Ok(Claim::Overwrite { upload_id }) => {
             let has_password: bool = sqlx::query_scalar(
                 "UPDATE shares SET upload_id = $2, entry = $3, file_count = $4, size_bytes = $5, visibility = $6, \
-                 password_hash = CASE WHEN $6 = 'password' THEN COALESCE($7, password_hash) END, expires_at = $8 \
-                 WHERE id = $1 RETURNING password_hash IS NOT NULL OR visibility <> 'password'",
+                 password_hash = CASE WHEN $6 = 'password' THEN COALESCE($7, password_hash) END, expires_at = $8, \
+                 sandbox = $9 WHERE id = $1 RETURNING password_hash IS NOT NULL OR visibility <> 'password'",
             )
             .bind(job.share_id)
             .bind(job.upload_id)
@@ -478,6 +498,7 @@ async fn store_and_claim(st: &AppState, job: &Job) -> Result<String, Fail> {
             .bind(job.visibility)
             .bind(&hash)
             .bind(job.expires_at)
+            .bind(job.sandbox)
             .fetch_one(&mut *tx)
             .await
             .map_err(internal)?;

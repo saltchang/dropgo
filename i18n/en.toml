@@ -26,6 +26,7 @@
 "footer.zip" = "Download zip"
 "form.bad_expiry" = "Pick an expiry time in the future."
 "form.bad_overwrite" = "The share to overwrite is not valid."
+"form.bad_sandbox" = "The sandbox setting must be true or false."
 "form.bad_visibility" = "Pick a visibility."
 "form.expiry" = "Expiry"
 "form.expiry_hint" = "Leave empty to never expire."

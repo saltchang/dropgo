@@ -26,6 +26,7 @@
 "footer.zip" = "下載 zip"
 "form.bad_expiry" = "請選一個未來的到期時間。"
 "form.bad_overwrite" = "要覆蓋的分享無效。"
+"form.bad_sandbox" = "沙箱設定必須是 true 或 false。"
 "form.bad_visibility" = "請選擇誰能開啟。"
 "form.expiry" = "到期"
 "form.expiry_hint" = "留空就永不過期。"
