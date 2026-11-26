@@ -21,9 +21,9 @@
 
 ## 4. CLI
 
-- [ ] 4.1 `upload --no-sandbox`, with `--replace` keeping the existing setting
-- [ ] 4.2 `edit --sandbox` and `edit --no-sandbox`, conflicting with each other
-- [ ] 4.3 End-to-end tests for each `agent-cli` scenario
+- [x] 4.1 `upload --no-sandbox`, with `--replace` keeping the existing setting
+- [x] 4.2 `edit --sandbox` and `edit --no-sandbox`, conflicting with each other
+- [x] 4.3 End-to-end tests for each `agent-cli` scenario
 
 ## 5. Skill, docs and browser checks
 
