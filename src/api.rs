@@ -124,6 +124,7 @@ struct ShareJson {
     url: String,
     state: String,
     visibility: String,
+    sandbox: bool,
     entry: String,
     file_count: i32,
     size_bytes: i64,
@@ -144,6 +145,7 @@ fn share_json(st: &AppState, s: ShareRow) -> ShareJson {
         path: s.path,
         state: s.state,
         visibility: s.visibility,
+        sandbox: s.sandbox,
         entry: s.entry,
         file_count: s.file_count,
         size_bytes: s.size_bytes,
@@ -255,12 +257,18 @@ async fn edit(
         Some(Value::String(s)) => s.clone(),
         Some(_) => return Err(bad()),
     };
+    let sandbox = match m.get("sandbox") {
+        None => share.sandbox,
+        Some(Value::Bool(b)) => *b,
+        Some(_) => return Err(bad()),
+    };
     let form = admin::EditForm {
         path: text("path")?.unwrap_or_else(|| share.path.clone()),
         visibility: visibility.to_string(),
         password,
         clear_password: (visibility != "password").then(|| "1".to_string()),
         expires_at,
+        no_sandbox: (!sandbox).then(|| "1".to_string()),
     };
     admin::save_edit(&st, owner, &share, &form).await?;
     reply(&st, owner, id).await

@@ -8,9 +8,9 @@
 
 ## 2. API
 
-- [ ] 2.1 `sandbox` in the share object and in `details.existing` of `path.exists`
-- [ ] 2.2 `sandbox` in `PATCH /api/v1/shares/{id}`, through `save_edit`
-- [ ] 2.3 Integration tests for each changed `agent-api` scenario, including the file read keeping the full sandbox
+- [x] 2.1 `sandbox` in the share object and in `details.existing` of `path.exists`
+- [x] 2.2 `sandbox` in `PATCH /api/v1/shares/{id}`, through `save_edit`
+- [x] 2.3 Integration tests for each changed `agent-api` scenario, including the file read keeping the full sandbox
 
 ## 3. Web UI
 

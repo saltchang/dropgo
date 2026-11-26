@@ -381,6 +381,8 @@ pub(crate) struct EditForm {
     /// `keep`, empty for never, or a time.
     #[serde(default)]
     pub(crate) expires_at: String,
+    /// The checkbox that turns the sandbox off.
+    pub(crate) no_sandbox: Option<String>,
 }
 
 async fn edit(
@@ -434,8 +436,8 @@ pub(crate) async fn save_edit(st: &AppState, owner: Uuid, share: &ShareRow, f: &
     }
     let ok: Option<bool> = sqlx::query_scalar(
         "UPDATE shares SET path = $3, visibility = $4, \
-         password_hash = CASE WHEN $4 = 'password' THEN COALESCE($5, password_hash) END, expires_at = $6 \
-         WHERE id = $1 AND owner_id = $2 AND state = 'active' \
+         password_hash = CASE WHEN $4 = 'password' THEN COALESCE($5, password_hash) END, expires_at = $6, \
+         sandbox = $7 WHERE id = $1 AND owner_id = $2 AND state = 'active' \
          RETURNING password_hash IS NOT NULL OR visibility <> 'password'",
     )
     .bind(share.id)
@@ -444,6 +446,7 @@ pub(crate) async fn save_edit(st: &AppState, owner: Uuid, share: &ShareRow, f: &
     .bind(visibility)
     .bind(&hash)
     .bind(expires_at)
+    .bind(f.no_sandbox.is_none())
     .fetch_optional(&mut *tx)
     .await
     .map_err(upload::internal)?;
