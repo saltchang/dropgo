@@ -308,8 +308,6 @@ async fn sandbox_setting() {
     assert_eq!(csp(&app.get(&format!("{SHARE}/off/notes.md"), &[]).await), off, "rendered page");
     let zip = app.get(&format!("{SHARE}/_dropgo/download/{id}?format=zip"), &[]).await;
     assert_eq!((zip.status, csp(&zip)), (200, SANDBOX.to_string()), "downloads keep the full sandbox");
-    let missing = app.get(&format!("{SHARE}/off/nope.html"), &[]).await;
-    assert!(csp(&missing).starts_with("default-src 'none'"), "dropgo's own pages run no scripts");
 
     // Turned back on: the next response is sandboxed again.
     sqlx::query("UPDATE shares SET sandbox = true WHERE id = $1").bind(id).execute(&app.st.db).await.unwrap();

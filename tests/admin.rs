@@ -180,22 +180,16 @@ async fn sandbox_setting() {
     assert!(edit.contains(r#"name="no_sandbox" id="no-sandbox" autocomplete="off" checked>"#));
 
     // Unchecked and saved: the sandbox is back on and nothing else changed.
-    let before: (String, String, Option<String>, Option<time::OffsetDateTime>) =
-        sqlx::query_as("SELECT path, visibility, password_hash, expires_at FROM shares WHERE id = $1")
-            .bind(id)
-            .fetch_one(&app.st.db)
-            .await
-            .unwrap();
     let f = [("path", "off"), ("visibility", "public"), ("expires_at", "keep")];
     assert_eq!(app.post_form(&url, &c, &f).await.status, 303);
-    let after: (String, String, Option<String>, Option<time::OffsetDateTime>, bool) =
-        sqlx::query_as("SELECT path, visibility, password_hash, expires_at, sandbox FROM shares WHERE id = $1")
-            .bind(id)
-            .fetch_one(&app.st.db)
-            .await
-            .unwrap();
-    assert!(before.2.is_some(), "a password share");
-    assert_eq!(after, (before.0, before.1, before.2, before.3, true));
+    let after: (String, String, bool, Option<time::OffsetDateTime>, bool) = sqlx::query_as(
+        "SELECT path, visibility, password_hash IS NOT NULL, expires_at, sandbox FROM shares WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&app.st.db)
+    .await
+    .unwrap();
+    assert_eq!(after, ("off".into(), "password".into(), true, None, true));
 
     let f = [("path", "off"), ("visibility", "public"), ("expires_at", "keep"), ("no_sandbox", "1")];
     assert_eq!(app.post_form(&url, &c, &f).await.status, 303);

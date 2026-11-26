@@ -2,11 +2,6 @@
 
 `src/share.rs` sets `Content-Security-Policy: sandbox ...` on every response that serves uploaded or rendered content, through `content()` and the `SANDBOX` constant. The API's file read in `src/api.rs` uses the same constant. dropgo's own pages on the share host (password form, error pages) get their own policy from `own_page()`, `default-src 'none'`, which already blocks scripts. Share settings live in the `shares` table and flow through three writers: the upload task (`upload::store_and_claim`), the Web UI edit (`admin::save_edit`) and the API edit, which builds an `admin::EditForm` and calls `save_edit`.
 
-## Goals
-
-- One boolean per share that decides whether its files and rendered pages get `allow-same-origin`.
-- Every writer sets it, every reader shows it, and nothing else about the sandbox changes.
-
 ## Decisions
 
 ### Storage
