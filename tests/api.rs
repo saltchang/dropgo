@@ -6,8 +6,6 @@ use serde_json::json;
 const MD: &[u8] = b"# Notes\n\nHello **agent**.";
 const HTML: &[u8] = b"<p>x";
 
-const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
-
 fn code(res: &Res) -> String {
     res.json()["error"]["code"].as_str().unwrap_or_default().to_string()
 }
@@ -264,11 +262,10 @@ async fn sandbox_setting() {
 
     // Patching other fields keeps it; patching it keeps the others.
     let hash = || async {
-        let h: Option<String> = sqlx::query_scalar("SELECT password_hash FROM shares WHERE path = 'rec'")
+        sqlx::query_scalar::<_, Option<String>>("SELECT password_hash FROM shares WHERE path = 'rec'")
             .fetch_one(&app.st.db)
             .await
-            .unwrap();
-        h
+            .unwrap()
     };
     let before = hash().await;
     let res = app.api("PATCH", &format!("/shares/{id}"), &t, Some(json!({ "expires_at": null }))).await;
@@ -311,6 +308,8 @@ async fn share_from_before_the_setting_is_sandboxed() {
     .unwrap();
     assert_eq!(app.api("GET", &format!("/shares/{id}"), &t, None).await.json()["sandbox"], true);
 }
+
+// ---------- trash and restore ----------
 
 #[tokio::test]
 async fn trash_and_restore() {

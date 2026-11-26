@@ -287,8 +287,6 @@ async fn font_in_uploaded_page_is_cors_readable() {
     assert_eq!((css.status, css.header("access-control-allow-origin")), (200, "*"));
 }
 
-const SANDBOX: &str = "sandbox allow-scripts allow-forms allow-popups allow-modals allow-downloads";
-
 /// Uploads a share and turns its sandbox off.
 async fn unsandboxed(app: &App, s: &str, path: &str, visibility: &str, files: &[(&str, &[u8])]) -> uuid::Uuid {
     let id = app.share(s, path, visibility, files).await;

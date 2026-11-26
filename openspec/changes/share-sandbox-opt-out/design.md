@@ -41,7 +41,7 @@ The multipart field `sandbox` is read with the other settings. Empty or `true` m
 
 ## Risks / Trade-offs
 
-- [Such a page can store data in the share host's `localStorage` or IndexedDB, which every share with the sandbox off can read] → Part of the same accepted risk; shares with the sandbox on still get an opaque origin and cannot reach it.
+- [Such a page can store data in the share host's `localStorage` or IndexedDB, which every share with the sandbox off can read] → Part of the risk the proposal's Decisions accept for a share with the sandbox off; shares with the sandbox on still get an opaque origin and cannot reach it.
 
 ## Migration Plan
 
