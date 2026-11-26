@@ -278,6 +278,25 @@ async fn sandbox_setting() {
 }
 
 #[tokio::test]
+async fn share_from_before_the_setting_is_sandboxed() {
+    let app = App::new().await;
+    let (uid, _, t) = app.token("alice").await;
+    // A row written without the column, as every share was before the migration.
+    let id = uuid::Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO shares (id, owner_id, path, state, visibility, upload_id, entry, file_count, size_bytes) \
+         VALUES ($1, $2, 'old', 'active', 'owner', $3, 'index.html', 1, 1)",
+    )
+    .bind(id)
+    .bind(uid)
+    .bind(uuid::Uuid::new_v4())
+    .execute(&app.st.db)
+    .await
+    .unwrap();
+    assert_eq!(app.api("GET", &format!("/shares/{id}"), &t, None).await.json()["sandbox"], true);
+}
+
+#[tokio::test]
 async fn password_share_keeps_password_when_sandbox_changes() {
     let app = App::new().await;
     let (_, _, t) = app.token("alice").await;

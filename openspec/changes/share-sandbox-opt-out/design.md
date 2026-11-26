@@ -33,7 +33,7 @@ The multipart field `sandbox` is read with the other settings. Empty or `true` m
 
 ### Edit
 
-`EditForm` gains `no_sandbox: Option<String>`, the checkbox, named like `clear_password`. `save_edit` stores `sandbox = no_sandbox.is_none()`. The Web UI edit page always sends the checkbox state. The API edit fills `no_sandbox` from the JSON `sandbox` field when present and from the share's current value when absent, so "only the fields present change" holds without a second code path.
+`EditForm` gains `no_sandbox: Option<String>`, the checkbox, named like `clear_password`. `save_edit` stores `sandbox = no_sandbox.is_none()`. The Web UI edit page sends the checkbox only when it is checked, so an unchecked box turns the sandbox on. The API edit fills `no_sandbox` from the JSON `sandbox` field when present and from the share's current value when absent, so "only the fields present change" holds without a second code path.
 
 ### Web UI
 

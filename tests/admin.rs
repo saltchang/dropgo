@@ -159,7 +159,11 @@ async fn sandbox_setting() {
 
     app.share(&s, "on", "public", &[("f:index.html", HTML)]).await;
     let res = app
-        .upload(&s, &[("path", "off"), ("visibility", "public"), ("sandbox", "false")], &[("f:index.html", HTML)])
+        .upload(
+            &s,
+            &[("path", "off"), ("visibility", "password"), ("password", "pw"), ("sandbox", "false")],
+            &[("f:index.html", HTML)],
+        )
         .await;
     assert_eq!(res.status, 200, "{}", res.text());
     let id = app.share_id("off").await;
@@ -176,21 +180,22 @@ async fn sandbox_setting() {
     assert!(edit.contains(r#"name="no_sandbox" id="no-sandbox" autocomplete="off" checked>"#));
 
     // Unchecked and saved: the sandbox is back on and nothing else changed.
-    let before: (String, String, Option<time::OffsetDateTime>) =
-        sqlx::query_as("SELECT path, visibility, expires_at FROM shares WHERE id = $1")
+    let before: (String, String, Option<String>, Option<time::OffsetDateTime>) =
+        sqlx::query_as("SELECT path, visibility, password_hash, expires_at FROM shares WHERE id = $1")
             .bind(id)
             .fetch_one(&app.st.db)
             .await
             .unwrap();
     let f = [("path", "off"), ("visibility", "public"), ("expires_at", "keep")];
     assert_eq!(app.post_form(&url, &c, &f).await.status, 303);
-    let after: (String, String, Option<time::OffsetDateTime>, bool) =
-        sqlx::query_as("SELECT path, visibility, expires_at, sandbox FROM shares WHERE id = $1")
+    let after: (String, String, Option<String>, Option<time::OffsetDateTime>, bool) =
+        sqlx::query_as("SELECT path, visibility, password_hash, expires_at, sandbox FROM shares WHERE id = $1")
             .bind(id)
             .fetch_one(&app.st.db)
             .await
             .unwrap();
-    assert_eq!(after, (before.0, before.1, before.2, true));
+    assert!(before.2.is_some(), "a password share");
+    assert_eq!(after, (before.0, before.1, before.2, before.3, true));
 
     let f = [("path", "off"), ("visibility", "public"), ("expires_at", "keep"), ("no_sandbox", "1")];
     assert_eq!(app.post_form(&url, &c, &f).await.status, 303);
