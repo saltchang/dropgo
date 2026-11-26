@@ -193,6 +193,7 @@ input:disabled { opacity: .5; cursor: not-allowed; }
 }
 .notice > .icon { color: var(--warn); margin-top: .2rem; }
 .notice p { margin: 0 0 .5rem; }
+.sandbox-field:not(:has(:checked)) .notice { display: none; }
 .badge {
   display: inline-flex;
   align-items: center;

@@ -187,6 +187,7 @@ struct Row {
     /// The entry file and its type, shown so the search can match them.
     entry: String,
     kind: &'static str,
+    sandbox: bool,
     expires: Option<(String, String)>,
     size: String,
     created: (String, String),
@@ -260,6 +261,7 @@ async fn render_list(
             visibility: l.t.s(&format!("visibility.{}", s.visibility)).to_string(),
             vis: s.visibility.clone(),
             kind: if s.entry.ends_with(".md") { "Markdown" } else { "HTML" },
+            sandbox: s.sandbox,
             entry: s.entry.rsplit('/').next().unwrap_or_default().to_string(),
             expires: s.expires_at.map(|e| (rfc3339(e), utc_text(e))),
             size: human_size(s.size_bytes),
@@ -336,6 +338,7 @@ struct EditPage<'a> {
     share: ShareRow,
     path: String,
     visibility: String,
+    sandbox: bool,
     expires: Option<(String, String)>,
     error: Option<String>,
 }
@@ -360,6 +363,7 @@ async fn edit_page(
                 l,
                 path: share.path.clone(),
                 visibility: share.visibility.clone(),
+                sandbox: share.sandbox,
                 expires: share.expires_at.map(|e| (rfc3339(e), utc_text(e))),
                 share,
                 error: None,
@@ -402,7 +406,8 @@ async fn edit(
             let l = layout(&st, owner, "shares", &format!("/shares/{id}/edit")).await;
             let error = Some(fail.message(l.t));
             let expires = share.expires_at.map(|e| (rfc3339(e), utc_text(e)));
-            html(EditPage { l, share, path: f.path, visibility: f.visibility, expires, error })
+            let sandbox = f.no_sandbox.is_none();
+            html(EditPage { l, share, path: f.path, visibility: f.visibility, sandbox, expires, error })
         }
     }
 }

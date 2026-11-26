@@ -14,10 +14,10 @@
 
 ## 3. Web UI
 
-- [ ] 3.1 Upload page: the checkbox, hint and warning, and `upload.mjs` sending it and filling it from the overwrite prompt
-- [ ] 3.2 Edit page: the checkbox starting from the share's setting, and saving it
-- [ ] 3.3 Share list: the warning badge
-- [ ] 3.4 Integration tests for the `admin-ui` scenarios a request can check
+- [x] 3.1 Upload page: the checkbox, hint and warning, and `upload.mjs` sending it and filling it from the overwrite prompt
+- [x] 3.2 Edit page: the checkbox starting from the share's setting, and saving it
+- [x] 3.3 Share list: the warning badge
+- [x] 3.4 Integration tests for the `admin-ui` scenarios a request can check
 
 ## 4. CLI
 
